@@ -57,6 +57,9 @@ EXPORT_SYMBOL(kimage_voffset);
 unsigned long empty_zero_page[PAGE_SIZE / sizeof(unsigned long)] __page_aligned_bss;
 EXPORT_SYMBOL(empty_zero_page);
 
+/**
+ * 定义了三个全局数组，用来存放各级页表的页表项
+ * */
 static pte_t bm_pte[PTRS_PER_PTE] __page_aligned_bss;
 static pmd_t bm_pmd[PTRS_PER_PMD] __page_aligned_bss __maybe_unused;
 static pud_t bm_pud[PTRS_PER_PUD] __page_aligned_bss __maybe_unused;
@@ -1216,9 +1219,9 @@ void __init early_fixmap_init(void)
 	p4d_t *p4dp, p4d;
 	pud_t *pudp;
 	pmd_t *pmdp;
-	unsigned long addr = FIXADDR_START;
+	unsigned long addr = FIXADDR_START; // FIXADDR_START定义了Fixed map区域的起始地址
 
-	pgdp = pgd_offset_k(addr);
+	pgdp = pgd_offset_k(addr); // 获取addr地址对应的pgd中的页表项，这个pgd正是swapper_pg_dir全局页表
 	p4dp = p4d_offset(pgdp, addr);
 	p4d = READ_ONCE(*p4dp);
 	if (CONFIG_PGTABLE_LEVELS > 3 &&
@@ -1232,13 +1235,13 @@ void __init early_fixmap_init(void)
 		pudp = pud_offset_kimg(p4dp, addr);
 	} else {
 		if (p4d_none(p4d))
-			__p4d_populate(p4dp, __pa_symbol(bm_pud), P4D_TYPE_TABLE);
+			__p4d_populate(p4dp, __pa_symbol(bm_pud), P4D_TYPE_TABLE); // 将bm_pud的物理地址写入p4d对应的页表项中
 		pudp = fixmap_pud(addr);
 	}
 	if (pud_none(READ_ONCE(*pudp)))
-		__pud_populate(pudp, __pa_symbol(bm_pmd), PUD_TYPE_TABLE);
+		__pud_populate(pudp, __pa_symbol(bm_pmd), PUD_TYPE_TABLE); // 将bm_pmd的物理地址写入pud对应的页表项中
 	pmdp = fixmap_pmd(addr);
-	__pmd_populate(pmdp, __pa_symbol(bm_pte), PMD_TYPE_TABLE);
+	__pmd_populate(pmdp, __pa_symbol(bm_pte), PMD_TYPE_TABLE); // 将bm_pte的物理地址写入pmd对应的页表项中
 
 	/*
 	 * The boot-ioremap range spans multiple pmds, for which

@@ -8,26 +8,35 @@
 
 #include <linux/mmzone.h>
 #include <linux/sizes.h>
-
 #include <asm/pgtable-bits.h>
 
+/**
+ * CONFIG_MMU会影响asm/page.h中使用到的函数
+ * TODO: 根据这里列出的布局，画出一张RV64中虚拟地址空间的布局示意图
+ * */
 #ifndef CONFIG_MMU
 #define KERNEL_LINK_ADDR	PAGE_OFFSET
 #else
 
-#define ADDRESS_SPACE_END	(UL(-1))
+#define ADDRESS_SPACE_END	(UL(-1)) // 虚拟地址空间的结束位置
 
 #ifdef CONFIG_64BIT
 /* Leave 2GB for kernel and BPF at the end of the address space */
-#define KERNEL_LINK_ADDR	(ADDRESS_SPACE_END - SZ_2G + 1)
+#define KERNEL_LINK_ADDR	(ADDRESS_SPACE_END - SZ_2G + 1) // 将虚拟地址空间的最后2GB留给内核
 #else
-#define KERNEL_LINK_ADDR	PAGE_OFFSET
-#endif
+#define KERNEL_LINK_ADDR	PAGE_OFFSET // 32位系统中内核的加载位置仍为PAGE_OFFSET
+#endif /* CONFIG_64BIT */
 
-#define VMALLOC_SIZE     (KERN_VIRT_SIZE >> 1)
+/**
+ * VMALLOC
+ * */
+#define VMALLOC_SIZE     (KERN_VIRT_SIZE >> 1) // KERN_VIRT_SIZE的定义详见asm/page.h，大小为(-PAGE_OFFSET)
 #define VMALLOC_END      (PAGE_OFFSET - 1)
 #define VMALLOC_START    (PAGE_OFFSET - VMALLOC_SIZE)
 
+/**
+ * BPF——JIT_REGION
+ * */
 #define BPF_JIT_REGION_SIZE	(SZ_128M)
 #ifdef CONFIG_64BIT
 /* KASLR should leave at least 128MB for BPF after the kernel */
@@ -36,13 +45,13 @@
 #else
 #define BPF_JIT_REGION_START	(PAGE_OFFSET - BPF_JIT_REGION_SIZE)
 #define BPF_JIT_REGION_END	(VMALLOC_END)
-#endif
+#endif /* CONFIG_64BIT */
 
 /* Modules always live before the kernel */
 #ifdef CONFIG_64BIT
 #define MODULES_VADDR	(PFN_ALIGN((unsigned long)&_end) - SZ_2G)
 #define MODULES_END	(PFN_ALIGN((unsigned long)&_start))
-#endif
+#endif /* CONFIG_64BIT */
 
 /*
  * Roughly size the vmemmap space to be large enough to fit enough
@@ -61,28 +70,38 @@
  */
 #define vmemmap		((struct page *)VMEMMAP_START)
 
+/**
+ * PCI_IO
+ * */
 #define PCI_IO_SIZE      SZ_16M
 #define PCI_IO_END       VMEMMAP_START
 #define PCI_IO_START     (PCI_IO_END - PCI_IO_SIZE)
 
+/**
+ * FIXADDR
+ * */
 #define FIXADDR_TOP      PCI_IO_START
 #ifdef CONFIG_64BIT
 #define FIXADDR_SIZE     PMD_SIZE
 #else
 #define FIXADDR_SIZE     PGDIR_SIZE
-#endif
+#endif /* CONFIG_64BIT */
 #define FIXADDR_START    (FIXADDR_TOP - FIXADDR_SIZE)
 
-#endif
+#endif /* CONFIG_MMU */
+
 
 #ifdef CONFIG_XIP_KERNEL
 #define XIP_OFFSET		SZ_8M
-#endif
+#endif /* CONFIG_XIP_KERNEL */
+
 
 #ifndef __ASSEMBLY__
-
 /* Page Upper Directory not used in RISC-V */
-#include <asm-generic/pgtable-nopud.h>
+#ifndef CONFIG_RV64_5LEVEL
+#include <asm-generic/pgtable-nopud.h> // lhy_del：如果是5级分页，这里不应该关闭pud
+#endif /* CONFIG_RV64_5LEVEL */
+
 #include <asm/page.h>
 #include <asm/tlbflush.h>
 #include <linux/mm_types.h>
@@ -106,42 +125,37 @@
 
 #ifdef CONFIG_MMU
 /* Number of entries in the page global directory */
-#define PTRS_PER_PGD    (PAGE_SIZE / sizeof(pgd_t))
+#define PTRS_PER_PGD    (PAGE_SIZE / sizeof(pgd_t)) // TODO：这个常量定义的位置需要明确，因为pgtable-64.h中也有对应的定义
 /* Number of entries in the page table */
 #define PTRS_PER_PTE    (PAGE_SIZE / sizeof(pte_t))
 
 /* Number of PGD entries that a user-mode program can use */
-#define USER_PTRS_PER_PGD   (TASK_SIZE / PGDIR_SIZE)
+#define USER_PTRS_PER_PGD   (TASK_SIZE / PGDIR_SIZE) // 根据进程的大小需要多少个PGD来映射来计算出需要多少个PTR
 
-/* Page protection bits */
+/**
+ * Page protection bits
+ */
 #define _PAGE_BASE	(_PAGE_PRESENT | _PAGE_ACCESSED | _PAGE_USER)
-
 #define PAGE_NONE		__pgprot(_PAGE_PROT_NONE)
-#define PAGE_READ		__pgprot(_PAGE_BASE | _PAGE_READ)
-#define PAGE_WRITE		__pgprot(_PAGE_BASE | _PAGE_READ | _PAGE_WRITE)
 #define PAGE_EXEC		__pgprot(_PAGE_BASE | _PAGE_EXEC)
+#define PAGE_READ		__pgprot(_PAGE_BASE | _PAGE_READ)
 #define PAGE_READ_EXEC		__pgprot(_PAGE_BASE | _PAGE_READ | _PAGE_EXEC)
-#define PAGE_WRITE_EXEC		__pgprot(_PAGE_BASE | _PAGE_READ |	\
-					 _PAGE_EXEC | _PAGE_WRITE)
-
+#define PAGE_WRITE		__pgprot(_PAGE_BASE | _PAGE_READ | _PAGE_WRITE)
+#define PAGE_WRITE_EXEC		__pgprot(_PAGE_BASE | _PAGE_READ | _PAGE_EXEC | _PAGE_WRITE)
 #define PAGE_COPY		PAGE_READ
 #define PAGE_COPY_EXEC		PAGE_EXEC
 #define PAGE_COPY_READ_EXEC	PAGE_READ_EXEC
 #define PAGE_SHARED		PAGE_WRITE
 #define PAGE_SHARED_EXEC	PAGE_WRITE_EXEC
-
 #define _PAGE_KERNEL		(_PAGE_READ \
 				| _PAGE_WRITE \
 				| _PAGE_PRESENT \
 				| _PAGE_ACCESSED \
 				| _PAGE_DIRTY)
-
 #define PAGE_KERNEL		__pgprot(_PAGE_KERNEL)
 #define PAGE_KERNEL_READ	__pgprot(_PAGE_KERNEL & ~_PAGE_WRITE)
 #define PAGE_KERNEL_EXEC	__pgprot(_PAGE_KERNEL | _PAGE_EXEC)
-#define PAGE_KERNEL_READ_EXEC	__pgprot((_PAGE_KERNEL & ~_PAGE_WRITE) \
-					 | _PAGE_EXEC)
-
+#define PAGE_KERNEL_READ_EXEC	__pgprot((_PAGE_KERNEL & ~_PAGE_WRITE) | _PAGE_EXEC)
 #define PAGE_TABLE		__pgprot(_PAGE_TABLE)
 
 /*
@@ -172,21 +186,26 @@ extern pgd_t swapper_pg_dir[];
 #define __S110	PAGE_SHARED_EXEC
 #define __S111	PAGE_SHARED_EXEC
 
+
+/* 判断pmd页表项是否有效的函数 */
 static inline int pmd_present(pmd_t pmd)
 {
 	return (pmd_val(pmd) & (_PAGE_PRESENT | _PAGE_PROT_NONE));
 }
 
+/* 判断pmd页表项是否为0的函数 */
 static inline int pmd_none(pmd_t pmd)
 {
 	return (pmd_val(pmd) == 0);
 }
 
+/* 判断pmd页表项无效的函数 */
 static inline int pmd_bad(pmd_t pmd)
 {
 	return !pmd_present(pmd);
 }
 
+/* 判断是否为leaf pmd的函数 */
 #define pmd_leaf	pmd_leaf
 static inline int pmd_leaf(pmd_t pmd)
 {
@@ -194,93 +213,115 @@ static inline int pmd_leaf(pmd_t pmd)
 	       (pmd_val(pmd) & (_PAGE_READ | _PAGE_WRITE | _PAGE_EXEC));
 }
 
+/* 为pmd页表项赋值的函数 */
 static inline void set_pmd(pmd_t *pmdp, pmd_t pmd)
 {
 	*pmdp = pmd;
 }
 
+/* 清空pmd页表项的函数 */
 static inline void pmd_clear(pmd_t *pmdp)
 {
 	set_pmd(pmdp, __pmd(0));
 }
 
+/* 页帧号 -> pgd页表项 */
 static inline pgd_t pfn_pgd(unsigned long pfn, pgprot_t prot)
 {
 	return __pgd((pfn << _PAGE_PFN_SHIFT) | pgprot_val(prot));
 }
 
+/* Yields the page frame number (PFN) of a page table entry */
+/* 页表项 -> 页帧号 */
 static inline unsigned long _pgd_pfn(pgd_t pgd)
 {
 	return pgd_val(pgd) >> _PAGE_PFN_SHIFT;
 }
 
-static inline struct page *pmd_page(pmd_t pmd)
-{
-	return pfn_to_page(pmd_val(pmd) >> _PAGE_PFN_SHIFT);
-}
-
-static inline unsigned long pmd_page_vaddr(pmd_t pmd)
-{
-	return (unsigned long)pfn_to_virt(pmd_val(pmd) >> _PAGE_PFN_SHIFT);
-}
-
-static inline pte_t pmd_pte(pmd_t pmd)
-{
-	return __pte(pmd_val(pmd));
-}
-
-/* Yields the page frame number (PFN) of a page table entry */
 static inline unsigned long pte_pfn(pte_t pte)
 {
 	return (pte_val(pte) >> _PAGE_PFN_SHIFT);
 }
 
+
+/* pmd页表项 -> 页帧号 —> 页帧结构体 */
+static inline struct page *pmd_page(pmd_t pmd)
+{
+	return pfn_to_page(pmd_val(pmd) >> _PAGE_PFN_SHIFT);
+}
+
+/* pmd页表项 -> 页帧号 -> 页帧对应的虚拟地址 */
+static inline unsigned long pmd_page_vaddr(pmd_t pmd)
+{
+	return (unsigned long)pfn_to_virt(pmd_val(pmd) >> _PAGE_PFN_SHIFT);
+}
+
+/* pmd页表项 -> pte页表项 */
+static inline pte_t pmd_pte(pmd_t pmd)
+{
+	return __pte(pmd_val(pmd));
+}
+
+
+
+
+/* pte页表项 -> 页帧号 -> 页帧结构体 */
 #define pte_page(x)     pfn_to_page(pte_pfn(x))
 
 /* Constructs a page table entry */
+/* 页帧号 -> pte页表项  */
 static inline pte_t pfn_pte(unsigned long pfn, pgprot_t prot)
 {
 	return __pte((pfn << _PAGE_PFN_SHIFT) | pgprot_val(prot));
 }
 
+/* 页帧结构体 -> 页帧号 -> pte页表项 */
 #define mk_pte(page, prot)       pfn_pte(page_to_pfn(page), prot)
 
+/* 判断pte页表项是否有效的函数 */
 static inline int pte_present(pte_t pte)
 {
 	return (pte_val(pte) & (_PAGE_PRESENT | _PAGE_PROT_NONE));
 }
 
+/* 判断pte页表项是否为0的函数 */
 static inline int pte_none(pte_t pte)
 {
 	return (pte_val(pte) == 0);
 }
 
+/* 设置pte页表项的写权限位 */
 static inline int pte_write(pte_t pte)
 {
 	return pte_val(pte) & _PAGE_WRITE;
 }
 
+/* 设置pte页表项的执行权限位 */
 static inline int pte_exec(pte_t pte)
 {
 	return pte_val(pte) & _PAGE_EXEC;
 }
 
+/* 设置pte页表项是否指向物理页（leaf pte） */
 static inline int pte_huge(pte_t pte)
 {
 	return pte_present(pte)
 		&& (pte_val(pte) & (_PAGE_READ | _PAGE_WRITE | _PAGE_EXEC));
 }
 
+/* 设置pte页表项的脏位 */
 static inline int pte_dirty(pte_t pte)
 {
 	return pte_val(pte) & _PAGE_DIRTY;
 }
 
+/* 设置pte页表项的访问位 */
 static inline int pte_young(pte_t pte)
 {
 	return pte_val(pte) & _PAGE_ACCESSED;
 }
 
+/* _PAGE_SOFT */
 static inline int pte_special(pte_t pte)
 {
 	return pte_val(pte) & _PAGE_SPECIAL;
@@ -345,7 +386,7 @@ static inline int pmd_protnone(pmd_t pmd)
 {
 	return pte_protnone(pmd_pte(pmd));
 }
-#endif
+#endif /* CONFIG_NUMA_BALANCING */
 
 /* Modify page protection bits */
 static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
@@ -372,6 +413,7 @@ static inline void update_mmu_cache(struct vm_area_struct *vma,
 }
 
 #define __HAVE_ARCH_PTE_SAME
+/* 判断两个pte页表项有的值是否相同 */
 static inline int pte_same(pte_t pte_a, pte_t pte_b)
 {
 	return pte_val(pte_a) == pte_val(pte_b);
@@ -382,6 +424,7 @@ static inline int pte_same(pte_t pte_a, pte_t pte_b)
  * a page table are directly modified.  Thus, the following hook is
  * made available.
  */
+/* 设置pte页表项的值 */
 static inline void set_pte(pte_t *ptep, pte_t pteval)
 {
 	*ptep = pteval;
@@ -398,6 +441,7 @@ static inline void set_pte_at(struct mm_struct *mm,
 	set_pte(ptep, pteval);
 }
 
+/* 将pte页表项清空 */
 static inline void pte_clear(struct mm_struct *mm,
 	unsigned long addr, pte_t *ptep)
 {
@@ -497,7 +541,7 @@ static inline int ptep_clear_flush_young(struct vm_area_struct *vma,
 #define KERN_VIRT_START	(-(BIT(CONFIG_VA_BITS)) + TASK_SIZE)
 #else
 #define KERN_VIRT_START	FIXADDR_START
-#endif
+#endif /* CONFIG_64BIT */
 
 /*
  * Task size is 0x4000000000 for RV64 or 0x9fc00000 for RV32.
@@ -507,7 +551,7 @@ static inline int ptep_clear_flush_young(struct vm_area_struct *vma,
 #define TASK_SIZE (PGDIR_SIZE * PTRS_PER_PGD / 2)
 #else
 #define TASK_SIZE FIXADDR_START
-#endif
+#endif /* CONFIG_64BIT */
 
 #else /* CONFIG_MMU */
 
@@ -518,13 +562,14 @@ static inline int ptep_clear_flush_young(struct vm_area_struct *vma,
 #define VMALLOC_START		0
 #define VMALLOC_END		TASK_SIZE
 
-#endif /* !CONFIG_MMU */
+#endif /* CONFIG_MMU */
 
 #define kern_addr_valid(addr)   (1) /* FIXME */
 
 extern char _start[];
 extern void *_dtb_early_va;
 extern uintptr_t _dtb_early_pa;
+
 #if defined(CONFIG_XIP_KERNEL) && defined(CONFIG_MMU)
 #define dtb_early_va	(*(void **)XIP_FIXUP(&_dtb_early_va))
 #define dtb_early_pa	(*(uintptr_t *)XIP_FIXUP(&_dtb_early_pa))

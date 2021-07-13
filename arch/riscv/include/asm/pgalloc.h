@@ -56,9 +56,7 @@ static inline pgd_t *pgd_alloc(struct mm_struct *mm)
 }
 
 #ifndef __PAGETABLE_PMD_FOLDED
-
 #define __pmd_free_tlb(tlb, pmd, addr)  pmd_free((tlb)->mm, pmd)
-
 #endif /* __PAGETABLE_PMD_FOLDED */
 
 #define __pte_free_tlb(tlb, pte, buf)   \

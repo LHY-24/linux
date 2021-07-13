@@ -114,8 +114,8 @@ __early_ioremap(resource_size_t phys_addr, unsigned long size, pgprot_t prot)
 	WARN_ON(system_state >= SYSTEM_RUNNING);
 
 	slot = -1;
-	for (i = 0; i < FIX_BTMAPS_SLOTS; i++) {
-		if (!prev_map[i]) {
+	for (i = 0; i < FIX_BTMAPS_SLOTS; i++) { // 找到一个未映射的prev_map[i]
+		if (!prev_map[i]) { // 如果prev_map[i]为空，说明尚未映射
 			slot = i;
 			break;
 		}
@@ -130,25 +130,25 @@ __early_ioremap(resource_size_t phys_addr, unsigned long size, pgprot_t prot)
 	if (WARN_ON(!size || last_addr < phys_addr))
 		return NULL;
 
-	prev_size[slot] = size;
+	prev_size[slot] = size; // 记录要映射的大小
 	/*
 	 * Mappings have to be page-aligned
 	 */
-	offset = offset_in_page(phys_addr);
-	phys_addr &= PAGE_MASK;
-	size = PAGE_ALIGN(last_addr + 1) - phys_addr;
+	offset = offset_in_page(phys_addr); // 获取offset：#define offset_in_page(ptr)	((unsigned long)(ptr) & ~PAGE_MASK)
+	phys_addr &= PAGE_MASK; // 获取PPN
+	size = PAGE_ALIGN(last_addr + 1) - phys_addr; // PAGE_ALIGN(addr):(addr + PAGE_SIZE -1) & PAGE_MASK
 
 	/*
 	 * Mappings have to fit in the FIX_BTMAP area.
 	 */
-	nrpages = size >> PAGE_SHIFT;
+	nrpages = size >> PAGE_SHIFT; // TODO：这里为什么要右移PAGE_SHIFT？
 	if (WARN_ON(nrpages > NR_FIX_BTMAPS))
 		return NULL;
 
 	/*
 	 * Ok, go for it..
 	 */
-	idx = FIX_BTMAP_BEGIN - NR_FIX_BTMAPS*slot;
+	idx = FIX_BTMAP_BEGIN - NR_FIX_BTMAPS*slot; // TODO：这里有点疑问，FIX_BTMAP_BEGIN的大小为447个4K大小的页面，而slot_virt每个区间大小为256K，256*7 > 447
 	while (nrpages > 0) {
 		if (after_paging_init)
 			__late_set_fixmap(idx, phys_addr, prot);
@@ -161,7 +161,7 @@ __early_ioremap(resource_size_t phys_addr, unsigned long size, pgprot_t prot)
 	WARN(early_ioremap_debug, "%s(%pa, %08lx) [%d] => %08lx + %08lx\n",
 	     __func__, &phys_addr, size, slot, offset, slot_virt[slot]);
 
-	prev_map[slot] = (void __iomem *)(offset + slot_virt[slot]);
+	prev_map[slot] = (void __iomem *)(offset + slot_virt[slot]); // prev_map[slot]存放了该物理地址对应的虚拟地址
 	return prev_map[slot];
 }
 

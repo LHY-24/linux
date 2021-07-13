@@ -20,15 +20,28 @@
  * These 'compile-time allocated' memory buffers are page-sized. Use
  * set_fixmap(idx,phys) to associate physical memory with fixmap indices.
  */
+
+/**
+ * 这一部分的内容可以参照arch/arm64/include/asm/fixmap.h
+ * */
 enum fixed_addresses {
 	FIX_HOLE,
+
+	/*
+	 * Used for kernel page table creation, so unmapped memory may be used
+	 * for tables.
+	 */
 	FIX_PTE,
 	FIX_PMD,
+	FIX_PUD, // lhy_add
+	FIX_P4D, // lhy_add
+	FIX_PGD, // lhy_add
 	FIX_TEXT_POKE1,
 	FIX_TEXT_POKE0,
 	FIX_EARLYCON_MEM_BASE,
 
 	__end_of_permanent_fixed_addresses,
+
 	/*
 	 * Temporary boot-time mappings, used by early_ioremap(),
 	 * before ioremap() is functional.

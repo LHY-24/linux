@@ -410,7 +410,7 @@ int apply_relocate_add(Elf_Shdr *sechdrs, const char *strtab,
 #if defined(CONFIG_MMU) && defined(CONFIG_64BIT)
 void *module_alloc(unsigned long size)
 {
-	return __vmalloc_node_range(size, 1, MODULES_VADDR,
+	return __vmalloc_node_range(size, 1, MODULES_VADDR, // MODULES_VADDR和MODULES_END分别为modules部分的起始地址和结束地址
 				    MODULES_END, GFP_KERNEL,
 				    PAGE_KERNEL, 0, NUMA_NO_NODE,
 				    __builtin_return_address(0));

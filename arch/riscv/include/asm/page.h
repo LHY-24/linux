@@ -12,18 +12,19 @@
 #include <linux/pfn.h>
 #include <linux/const.h>
 
-#define PAGE_SHIFT	(12)
-#define PAGE_SIZE	(_AC(1, UL) << PAGE_SHIFT)
-#define PAGE_MASK	(~(PAGE_SIZE - 1))
+#define PAGE_SHIFT	(12) // 定义页框的偏移量
+#define PAGE_SIZE	(_AC(1, UL) << PAGE_SHIFT) // 定义页框的大小
+#define PAGE_MASK	(~(PAGE_SIZE - 1)) // 定义页框的掩码
 
 #ifdef CONFIG_64BIT
 #define HUGE_MAX_HSTATE		2
 #else
 #define HUGE_MAX_HSTATE		1
 #endif
-#define HPAGE_SHIFT		PMD_SHIFT
-#define HPAGE_SIZE		(_AC(1, UL) << HPAGE_SHIFT)
-#define HPAGE_MASK              (~(HPAGE_SIZE - 1))
+
+#define HPAGE_SHIFT		PMD_SHIFT // PMD对应的大页的偏移为20位
+#define HPAGE_SIZE		(_AC(1, UL) << HPAGE_SHIFT) // PMD对应的大页的大小为1MB
+#define HPAGE_MASK              (~(HPAGE_SIZE - 1)) // PMD对应的大页的掩码
 #define HUGETLB_PAGE_ORDER      (HPAGE_SHIFT - PAGE_SHIFT)
 
 /*
@@ -33,7 +34,7 @@
  */
 #define PAGE_OFFSET		_AC(CONFIG_PAGE_OFFSET, UL)
 
-#define KERN_VIRT_SIZE (-PAGE_OFFSET)
+#define KERN_VIRT_SIZE 		(-PAGE_OFFSET)
 
 #ifndef __ASSEMBLY__
 
@@ -59,11 +60,13 @@
  */
 
 /* Page Global Directory entry */
+// 描述pgd中的页表项
 typedef struct {
 	unsigned long pgd;
 } pgd_t;
 
 /* Page Table entry */
+// 描述pte中的页表项
 typedef struct {
 	unsigned long pte;
 } pte_t;
@@ -74,10 +77,12 @@ typedef struct {
 
 typedef struct page *pgtable_t;
 
+// 将页表项类型转换为无符号类型
 #define pte_val(x)	((x).pte)
 #define pgd_val(x)	((x).pgd)
 #define pgprot_val(x)	((x).pgprot)
 
+// 将无符号类型转换为页表项类型
 #define __pte(x)	((pte_t) { (x) })
 #define __pgd(x)	((pgd_t) { (x) })
 #define __pgprot(x)	((pgprot_t) { (x) })
@@ -89,27 +94,27 @@ typedef struct page *pgtable_t;
 #endif
 
 #ifdef CONFIG_MMU
-extern unsigned long va_pa_offset;
+extern unsigned long va_pa_offset; // 进程虚拟地址空间中虚拟地址到物理地址的偏移量
 #ifdef CONFIG_64BIT
-extern unsigned long va_kernel_pa_offset;
-#endif
+extern unsigned long va_kernel_pa_offset; // 内核虚拟地址空间中虚拟地址到物理地址的偏移量
+#endif /* CONFIG_64BIT */
 #ifdef CONFIG_XIP_KERNEL
 extern unsigned long va_kernel_xip_pa_offset;
-#endif
+#endif /* CONFIG_XIP_KERNEL */
 extern unsigned long pfn_base;
 #define ARCH_PFN_OFFSET		(pfn_base)
 #else
 #define va_pa_offset		0
 #ifdef CONFIG_64BIT
 #define va_kernel_pa_offset	0
-#endif
+#endif /* CONFIG_64BIT */
 #define ARCH_PFN_OFFSET		(PAGE_OFFSET >> PAGE_SHIFT)
 #endif /* CONFIG_MMU */
 
 extern unsigned long kernel_virt_addr;
 
 #ifdef CONFIG_64BIT
-#define linear_mapping_pa_to_va(x)	((void *)((unsigned long)(x) + va_pa_offset))
+#define linear_mapping_pa_to_va(x)	((void *)((unsigned long)(x) + va_pa_offset)) // 物理地址到虚拟地址的线性映射
 #ifdef CONFIG_XIP_KERNEL
 #define kernel_mapping_pa_to_va(y)	({						\
 	unsigned long _y = y;								\
@@ -118,11 +123,11 @@ extern unsigned long kernel_virt_addr;
 		(void *)((unsigned long)(_y) + va_kernel_xip_pa_offset);		\
 	})
 #else
-#define kernel_mapping_pa_to_va(x)	((void *)((unsigned long)(x) + va_kernel_pa_offset))
-#endif
+#define kernel_mapping_pa_to_va(x)	((void *)((unsigned long)(x) + va_kernel_pa_offset)) // 物理地址到虚拟地址的内核映射
+#endif /* CONFIG_XIP_KERNEL */
 #define __pa_to_va_nodebug(x)		linear_mapping_pa_to_va(x)
 
-#define linear_mapping_va_to_pa(x)	((unsigned long)(x) - va_pa_offset)
+#define linear_mapping_va_to_pa(x)	((unsigned long)(x) - va_pa_offset) // 虚拟地址到物理地址的线性映射
 #ifdef CONFIG_XIP_KERNEL
 #define kernel_mapping_va_to_pa(y) ({						\
 	unsigned long _y = y;							\
@@ -131,17 +136,17 @@ extern unsigned long kernel_virt_addr;
 		((unsigned long)(_y) - va_kernel_pa_offset - XIP_OFFSET);	\
 	})
 #else
-#define kernel_mapping_va_to_pa(x)	((unsigned long)(x) - va_kernel_pa_offset)
-#endif
+#define kernel_mapping_va_to_pa(x)	((unsigned long)(x) - va_kernel_pa_offset) // 虚拟地址到物理地址的内核映射
+#endif /* CONFIG_XIP_KERNEL */
 #define __va_to_pa_nodebug(x)	({						\
 	unsigned long _x = x;							\
 	(_x < kernel_virt_addr) ?						\
 		linear_mapping_va_to_pa(_x) : kernel_mapping_va_to_pa(_x);	\
 	})
-#else
+#else /* CONFIG_64BIT */
 #define __pa_to_va_nodebug(x)  ((void *)((unsigned long) (x) + va_pa_offset))
 #define __va_to_pa_nodebug(x)  ((unsigned long)(x) - va_pa_offset)
-#endif
+#endif /* CONFIG_64BIT */
 
 #ifdef CONFIG_DEBUG_VIRTUAL
 extern phys_addr_t __virt_to_phys(unsigned long x);

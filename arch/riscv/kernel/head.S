@@ -26,6 +26,7 @@ _xip_fixup: .dword CONFIG_PHYS_RAM_BASE - CONFIG_XIP_PHYS_ADDR - XIP_OFFSET
 .endm
 #endif /* CONFIG_XIP_KERNEL */
 
+/* 起始位置 */
 __HEAD
 ENTRY(_start)
 	/*
@@ -39,34 +40,34 @@ ENTRY(_start)
 	 * This instruction decodes to "MZ" ASCII required by UEFI.
 	 */
 	c.li s4,-13
-	j _start_kernel
+	j _start_kernel /* 跳转到内核的启动位置 */
 #else
 	/* jump to start kernel */
 	j _start_kernel
 	/* reserved */
-	.word 0
+	.word 0 /* 在内存中连续存储0个字（4字节） */
 #endif
-	.balign 8
+	.balign 8 /* 按8字节对齐 */
 #ifdef CONFIG_RISCV_M_MODE
 	/* Image load offset (0MB) from start of RAM for M-mode */
-	.dword 0
+	.dword 0 /* 镜像加载的起始位置 */
 #else
 #if __riscv_xlen == 64
 	/* Image load offset(2MB) from start of RAM */
-	.dword 0x200000
+	.dword 0x200000 /* 在内存中连续存储双字（8字节） */
 #else
 	/* Image load offset(4MB) from start of RAM */
-	.dword 0x400000
-#endif
-#endif
+	.dword 0x400000 /* 在内存中连续存储双字（8字节） */
+#endif /* __riscv_xlen == 64 */
+#endif /* CONFIG_RISCV_M_MODE */
 	/* Effective size of kernel image */
-	.dword _end - _start
+	.dword _end - _start /* 内核镜像的有效大小  */
 	.dword __HEAD_FLAGS
 	.word RISCV_HEADER_VERSION
 	.word 0
 	.dword 0
 	.ascii RISCV_IMAGE_MAGIC
-	.balign 4
+	.balign 4 /* 按照4字节对齐 */
 	.ascii RISCV_IMAGE_MAGIC2
 #ifdef CONFIG_EFI
 	.word pe_head_start - _start
@@ -77,11 +78,11 @@ pe_head_start:
 	.word 0
 #endif
 
-.align 2
+.align 2 /* 按照2的2次幂字节对齐 */
 #ifdef CONFIG_MMU
 relocate:
 	/* Relocate return address */
-	la a1, kernel_virt_addr
+	la a1, kernel_virt_addr /* 令a1指向kernel_virt_addr */
 	XIP_FIXUP_OFFSET a1
 	REG_L a1, 0(a1)
 	la a2, _start
@@ -110,7 +111,7 @@ relocate:
 	or a0, a0, a1
 	sfence.vma
 	csrw CSR_SATP, a0
-.align 2
+.align 2 /* 按照2的2次幂字节对齐 */
 1:
 	/* Set trap vector to spin forever to help debug */
 	la a0, .Lsecondary_park
@@ -134,7 +135,7 @@ relocate:
 	ret
 #endif /* CONFIG_MMU */
 #ifdef CONFIG_SMP
-	.global secondary_start_sbi
+	.global secondary_start_sbi /* 声明全局符号，其他文件可以访问 */
 secondary_start_sbi:
 	/* Mask all interrupts */
 	csrw CSR_IE, zero
@@ -167,7 +168,7 @@ secondary_start_sbi:
 	REG_L sp, (a4)
 	REG_L tp, (a5)
 
-	.global secondary_start_common
+	.global secondary_start_common /* 声明全局符号，其他文件可以访问 */
 secondary_start_common:
 
 #ifdef CONFIG_MMU
@@ -180,7 +181,7 @@ secondary_start_common:
 	tail smp_callin
 #endif /* CONFIG_SMP */
 
-.align 2
+.align 2 /* 按照2的2次幂字节对齐 */
 setup_trap_vector:
 	/* Set trap vector to exception handler */
 	la a0, handle_exception
@@ -210,7 +211,7 @@ ENTRY(_start_kernel)
 	fence.i
 
 	/* Reset all registers except ra, a0, a1 */
-	call reset_regs
+	call reset_regs /* 将所有的寄存器复位 */
 
 	/*
 	 * Setup a PMP to permit access to all of memory.  Some machines may
@@ -224,7 +225,7 @@ ENTRY(_start_kernel)
 	csrw CSR_PMPADDR0, a0
 	li a0, (PMP_A_NAPOT | PMP_R | PMP_W | PMP_X)
 	csrw CSR_PMPCFG0, a0
-.align 2
+.align 2 /* 按照2的2次幂字节对齐 */
 pmp_done:
 
 	/*
@@ -282,9 +283,9 @@ pmp_done:
 
 #ifndef CONFIG_XIP_KERNEL
 	/* Clear BSS for flat non-ELF images */
-	la a3, __bss_start
-	la a4, __bss_stop
-	ble a4, a3, clear_bss_done
+	la a3, __bss_start /* 未初始化数据段的起始位置 */
+	la a4, __bss_stop /* 未初始化数据段的结束位置 */
+	ble a4, a3, clear_bss_done /* 如果start=end，说明bss区域为空 */
 clear_bss:
 	REG_S zero, (a3)
 	add a3, a3, RISCV_SZPTR

@@ -29,14 +29,14 @@
 
 #include "../kernel/head.h"
 
-unsigned long kernel_virt_addr = KERNEL_LINK_ADDR;
+unsigned long kernel_virt_addr = KERNEL_LINK_ADDR; // 内核空间的起始地址
 EXPORT_SYMBOL(kernel_virt_addr);
 #ifdef CONFIG_XIP_KERNEL
 #define kernel_virt_addr       (*((unsigned long *)XIP_FIXUP(&kernel_virt_addr)))
 #endif
 
 unsigned long empty_zero_page[PAGE_SIZE / sizeof(unsigned long)]
-							__page_aligned_bss;
+							__page_aligned_bss; // 填充为0的空闲页数组
 EXPORT_SYMBOL(empty_zero_page);
 
 extern char _start[];
@@ -45,11 +45,22 @@ void *_dtb_early_va __initdata;
 uintptr_t _dtb_early_pa __initdata;
 
 struct pt_alloc_ops {
-	pte_t *(*get_pte_virt)(phys_addr_t pa);
+	pte_t *(*get_pte_virt)(phys_addr_t pa); // 根据物理地址获取pte中对应的页表项
 	phys_addr_t (*alloc_pte)(uintptr_t va);
+
 #ifndef __PAGETABLE_PMD_FOLDED
 	pmd_t *(*get_pmd_virt)(phys_addr_t pa);
 	phys_addr_t (*alloc_pmd)(uintptr_t va);
+#endif
+
+#ifndef __PAGETABLE_PUD_FOLDED
+	pud_t *(*get_pud_virt)(phys_addr_t pa); // lhy_add
+	phys_addr_t (*alloc_pud)(uintptr_t va); // lhy_add
+#endif
+
+#ifndef __PAGETABLE_P4D_FOLDED
+	p4d_t *(*get_p4d_virt)(phys_addr_t pa); // lhy_add
+	phys_addr_t (*alloc_p4d)(uintptr_t va); // lhy_add
 #endif
 };
 
@@ -67,24 +78,36 @@ static void __init zone_sizes_init(void)
 	free_area_init(max_zone_pfns);
 }
 
+/* 将空闲页初始化为0的函数 */
 static void __init setup_zero_page(void)
 {
 	memset((void *)empty_zero_page, 0, PAGE_SIZE);
 }
 
+/**
+ * 虚拟内存布局相关：
+ * %s是输出字符串
+ * %x是输出长整型十六进制数据
+ * %ld是输出长整型十进制数据
+ * 08表示输出的宽度至少为8位，不够左边用0填充
+ * 4和12都表示输出的最大宽度
+ * */
 #if defined(CONFIG_MMU) && defined(CONFIG_DEBUG_VM)
+/* 以KB为单位输出该区域的相关信息（name,begin,top,size）*/
 static inline void print_mlk(char *name, unsigned long b, unsigned long t)
 {
 	pr_notice("%12s : 0x%08lx - 0x%08lx   (%4ld kB)\n", name, b, t,
 		  (((t) - (b)) >> 10));
 }
 
+/* 以MB为单位输出该区域的相关信息（name,begin,top,size）*/
 static inline void print_mlm(char *name, unsigned long b, unsigned long t)
 {
 	pr_notice("%12s : 0x%08lx - 0x%08lx   (%4ld MB)\n", name, b, t,
 		  (((t) - (b)) >> 20));
 }
 
+/* 打印虚拟内存的布局 */
 static void __init print_vm_layout(void)
 {
 	pr_notice("Virtual kernel memory layout:\n");
@@ -101,22 +124,21 @@ static void __init print_vm_layout(void)
 #ifdef CONFIG_64BIT
 	print_mlm("kernel", (unsigned long)KERNEL_LINK_ADDR,
 		  (unsigned long)ADDRESS_SPACE_END);
-#endif
+#endif /* CONFIG_64BIT */
 }
 #else
 static void print_vm_layout(void) { }
 #endif /* CONFIG_DEBUG_VM */
 
+/* 内存初始化函数 */
 void __init mem_init(void)
 {
 #ifdef CONFIG_FLATMEM
 	BUG_ON(!mem_map);
 #endif /* CONFIG_FLATMEM */
-
-	high_memory = (void *)(__va(PFN_PHYS(max_low_pfn)));
-	memblock_free_all();
-
-	print_vm_layout();
+	high_memory = (void *)(__va(PFN_PHYS(max_low_pfn))); // max_low_pfn表示低端内存中最后一个页框号
+	memblock_free_all(); // 释放所有的物理内存
+	print_vm_layout(); // 打印虚拟内存布局
 }
 
 void __init setup_bootmem(void)
@@ -142,7 +164,7 @@ void __init setup_bootmem(void)
 	 * map the kernel in the linear mapping as read-only: we do not want
 	 * any allocation to happen between _end and the next pmd aligned page.
 	 */
-	vmlinux_end = (vmlinux_end + PMD_SIZE - 1) & PMD_MASK;
+	vmlinux_end = (vmlinux_end + PMD_SIZE - 1) & PMD_MASK; // 对齐操作，然后获取vmlinux_end所在页框的下一个页框的页框号
 #endif
 	memblock_reserve(vmlinux_start, vmlinux_end - vmlinux_start);
 
@@ -177,10 +199,8 @@ void __init setup_bootmem(void)
 }
 
 #ifdef CONFIG_XIP_KERNEL
-
 extern char _xiprom[], _exiprom[];
 extern char _sdata[], _edata[];
-
 #endif /* CONFIG_XIP_KERNEL */
 
 #ifdef CONFIG_MMU
@@ -190,22 +210,24 @@ static struct pt_alloc_ops _pt_ops __ro_after_init;
 #define pt_ops (*(struct pt_alloc_ops *)XIP_FIXUP(&_pt_ops))
 #else
 #define pt_ops _pt_ops
-#endif
+#endif /* CONFIG_XIP_KERNEL */
 
 /* Offset between linear mapping virtual address and kernel load address */
-unsigned long va_pa_offset __ro_after_init;
+unsigned long va_pa_offset __ro_after_init; // 线性映射的虚拟地址与内核加载的物理地址之间的偏移
 EXPORT_SYMBOL(va_pa_offset);
 #ifdef CONFIG_XIP_KERNEL
 #define va_pa_offset   (*((unsigned long *)XIP_FIXUP(&va_pa_offset)))
-#endif
+#endif /* CONFIG_XIP_KERNEL */
+
 /* Offset between kernel mapping virtual address and kernel load address */
 #ifdef CONFIG_64BIT
-unsigned long va_kernel_pa_offset;
+unsigned long va_kernel_pa_offset; // 内核映射的虚拟地址与内核加载的物理地址之间的偏移
 EXPORT_SYMBOL(va_kernel_pa_offset);
 #endif
 #ifdef CONFIG_XIP_KERNEL
 #define va_kernel_pa_offset    (*((unsigned long *)XIP_FIXUP(&va_kernel_pa_offset)))
-#endif
+#endif /* CONFIG_XIP_KERNEL */
+
 unsigned long va_kernel_xip_pa_offset;
 EXPORT_SYMBOL(va_kernel_xip_pa_offset);
 #ifdef CONFIG_XIP_KERNEL
@@ -217,7 +239,6 @@ EXPORT_SYMBOL(pfn_base);
 pgd_t swapper_pg_dir[PTRS_PER_PGD] __page_aligned_bss;
 pgd_t trampoline_pg_dir[PTRS_PER_PGD] __page_aligned_bss;
 pte_t fixmap_pte[PTRS_PER_PTE] __page_aligned_bss;
-
 pgd_t early_pg_dir[PTRS_PER_PGD] __initdata __aligned(PAGE_SIZE);
 
 #ifdef CONFIG_XIP_KERNEL
@@ -228,18 +249,19 @@ pgd_t early_pg_dir[PTRS_PER_PGD] __initdata __aligned(PAGE_SIZE);
 
 void __set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t prot)
 {
-	unsigned long addr = __fix_to_virt(idx);
+	unsigned long addr = __fix_to_virt(idx); // 获取虚拟地址
 	pte_t *ptep;
 
 	BUG_ON(idx <= FIX_HOLE || idx >= __end_of_fixed_addresses);
 
-	ptep = &fixmap_pte[pte_index(addr)];
+	ptep = &fixmap_pte[pte_index(addr)]; // 获取该地址对应的fixmap_pte中的页表项
 
 	if (pgprot_val(prot))
-		set_pte(ptep, pfn_pte(phys >> PAGE_SHIFT, prot));
+		set_pte(ptep, pfn_pte(phys >> PAGE_SHIFT, prot)); // 将物理地址写入fixmap_pte
 	else
 		pte_clear(&init_mm, addr, ptep);
-	local_flush_tlb_page(addr);
+
+	local_flush_tlb_page(addr); // 刷新tlb
 }
 
 static inline pte_t *__init get_pte_virt_early(phys_addr_t pa)
@@ -385,15 +407,16 @@ static void __init create_pmd_mapping(pmd_t *pmdp,
 #define create_pgd_next_mapping(__nextp, __va, __pa, __sz, __prot)	\
 	create_pte_mapping(__nextp, __va, __pa, __sz, __prot)
 #define fixmap_pgd_next		fixmap_pte
-#endif
+#endif /* __PAGETABLE_PMD_FOLDED */
 
+/* 创建pgd的映射 */
 void __init create_pgd_mapping(pgd_t *pgdp,
 				      uintptr_t va, phys_addr_t pa,
 				      phys_addr_t sz, pgprot_t prot)
 {
 	pgd_next_t *nextp;
 	phys_addr_t next_phys;
-	uintptr_t pgd_idx = pgd_index(va);
+	uintptr_t pgd_idx = pgd_index(va); // 虚拟地址对应的页表项在pgd中的索引
 
 	if (sz == PGDIR_SIZE) {
 		if (pgd_val(pgdp[pgd_idx]) == 0)
@@ -414,10 +437,11 @@ void __init create_pgd_mapping(pgd_t *pgdp,
 	create_pgd_next_mapping(nextp, va, pa, sz, prot);
 }
 
+/* 获取最合适的映射范围 */
 static uintptr_t __init best_map_size(phys_addr_t base, phys_addr_t size)
 {
 	/* Upgrade to PMD_SIZE mappings whenever possible */
-	if ((base & (PMD_SIZE - 1)) || (size & (PMD_SIZE - 1)))
+	if ((base & (PMD_SIZE - 1)) || (size & (PMD_SIZE - 1))) // 判断与PMD_SIZE是否对齐
 		return PAGE_SIZE;
 
 	return PMD_SIZE;
@@ -458,7 +482,7 @@ uintptr_t load_pa, load_sz;
 #ifdef CONFIG_XIP_KERNEL
 #define load_pa        (*((uintptr_t *)XIP_FIXUP(&load_pa)))
 #define load_sz        (*((uintptr_t *)XIP_FIXUP(&load_sz)))
-#endif
+#endif /* CONFIG_XIP_KERNEL */
 
 #ifdef CONFIG_XIP_KERNEL
 uintptr_t xiprom, xiprom_sz;
@@ -484,25 +508,27 @@ static void __init create_kernel_page_table(pgd_t *pgdir, uintptr_t map_size)
 				   map_size, PAGE_KERNEL);
 }
 #else
+/* 创建内核页表 */
 static void __init create_kernel_page_table(pgd_t *pgdir, uintptr_t map_size)
 {
 	uintptr_t va, end_va;
 
-	end_va = kernel_virt_addr + load_sz;
-	for (va = kernel_virt_addr; va < end_va; va += map_size)
+	end_va = kernel_virt_addr + load_sz; // 内核的结束地址 = 起始地址 + 加载的内核大小
+	for (va = kernel_virt_addr; va < end_va; va += map_size) // 从起始地址开始，到结束地址为止，以map_size为单位建立内核映射
 		create_pgd_mapping(pgdir, va,
 				   load_pa + (va - kernel_virt_addr),
 				   map_size, PAGE_KERNEL_EXEC);
 }
-#endif
+#endif /* CONFIG_XIP_KERNEL */
 
 asmlinkage void __init setup_vm(uintptr_t dtb_pa)
 {
 	uintptr_t __maybe_unused pa;
 	uintptr_t map_size;
+
 #ifndef __PAGETABLE_PMD_FOLDED
 	pmd_t fix_bmap_spmd, fix_bmap_epmd;
-#endif
+#endif /* __PAGETABLE_PMD_FOLDED */
 
 #ifdef CONFIG_XIP_KERNEL
 	xiprom = (uintptr_t)CONFIG_XIP_PHYS_ADDR;
@@ -515,12 +541,13 @@ asmlinkage void __init setup_vm(uintptr_t dtb_pa)
 #else
 	load_pa = (uintptr_t)(&_start);
 	load_sz = (uintptr_t)(&_end) - load_pa;
-#endif
+#endif /* CONFIG_XIP_KERNEL */
 
-	va_pa_offset = PAGE_OFFSET - load_pa;
+	va_pa_offset = PAGE_OFFSET - load_pa; // 线性映射到的物理地址与虚拟地址之间的偏移
+
 #ifdef CONFIG_64BIT
-	va_kernel_pa_offset = kernel_virt_addr - load_pa;
-#endif
+	va_kernel_pa_offset = kernel_virt_addr - load_pa; // 内核映射到的物理地址与虚拟地址之间的偏移
+#endif /* CONFIG_64BIT */
 
 	pfn_base = PFN_DOWN(load_pa);
 
@@ -536,33 +563,41 @@ asmlinkage void __init setup_vm(uintptr_t dtb_pa)
 
 	pt_ops.alloc_pte = alloc_pte_early;
 	pt_ops.get_pte_virt = get_pte_virt_early;
+
 #ifndef __PAGETABLE_PMD_FOLDED
 	pt_ops.alloc_pmd = alloc_pmd_early;
 	pt_ops.get_pmd_virt = get_pmd_virt_early;
-#endif
+#endif /* __PAGETABLE_PMD_FOLDED */
+
 	/* Setup early PGD for fixmap */
 	create_pgd_mapping(early_pg_dir, FIXADDR_START,
-			   (uintptr_t)fixmap_pgd_next, PGDIR_SIZE, PAGE_TABLE);
+			   (uintptr_t)fixmap_pgd_next,
+			   PGDIR_SIZE, PAGE_TABLE);
 
 #ifndef __PAGETABLE_PMD_FOLDED
 	/* Setup fixmap PMD */
 	create_pmd_mapping(fixmap_pmd, FIXADDR_START,
-			   (uintptr_t)fixmap_pte, PMD_SIZE, PAGE_TABLE);
+			   (uintptr_t)fixmap_pte,
+			   PMD_SIZE, PAGE_TABLE);
+
 	/* Setup trampoline PGD and PMD */
 	create_pgd_mapping(trampoline_pg_dir, kernel_virt_addr,
-			   (uintptr_t)trampoline_pmd, PGDIR_SIZE, PAGE_TABLE);
+			   (uintptr_t)trampoline_pmd,
+			   PGDIR_SIZE, PAGE_TABLE);
+
 #ifdef CONFIG_XIP_KERNEL
 	create_pmd_mapping(trampoline_pmd, kernel_virt_addr,
 			   xiprom, PMD_SIZE, PAGE_KERNEL_EXEC);
 #else
 	create_pmd_mapping(trampoline_pmd, kernel_virt_addr,
 			   load_pa, PMD_SIZE, PAGE_KERNEL_EXEC);
-#endif
+#endif /* CONFIG_XIP_KERNEL */
+
 #else
 	/* Setup trampoline PGD */
 	create_pgd_mapping(trampoline_pg_dir, kernel_virt_addr,
 			   load_pa, PGDIR_SIZE, PAGE_KERNEL_EXEC);
-#endif
+#endif /* __PAGETABLE_PMD_FOLDED */
 
 	/*
 	 * Setup early PGD covering entire kernel which will allow
@@ -611,7 +646,8 @@ asmlinkage void __init setup_vm(uintptr_t dtb_pa)
 	dtb_early_va = __va(dtb_pa);
 #endif /* CONFIG_64BIT */
 #endif /* CONFIG_BUILTIN_DTB */
-#endif
+#endif /* __PAGETABLE_PMD_FOLDED */
+
 	dtb_early_pa = dtb_pa;
 
 	/*
@@ -642,7 +678,7 @@ asmlinkage void __init setup_vm(uintptr_t dtb_pa)
 		pr_warn("FIX_BTMAP_END:       %d\n", FIX_BTMAP_END);
 		pr_warn("FIX_BTMAP_BEGIN:     %d\n", FIX_BTMAP_BEGIN);
 	}
-#endif
+#endif /* __PAGETABLE_PMD_FOLDED */
 }
 
 #if defined(CONFIG_64BIT) && defined(CONFIG_STRICT_KERNEL_RWX)
@@ -659,7 +695,7 @@ void protect_kernel_linear_mapping_text_rodata(void)
 	set_memory_ro(rodata_start, (data_start - rodata_start) >> PAGE_SHIFT);
 	set_memory_nx(rodata_start, (data_start - rodata_start) >> PAGE_SHIFT);
 }
-#endif
+#endif /* defined(CONFIG_64BIT) && defined(CONFIG_STRICT_KERNEL_RWX) */
 
 static void __init setup_vm_final(void)
 {
@@ -673,10 +709,12 @@ static void __init setup_vm_final(void)
 	 */
 	pt_ops.alloc_pte = alloc_pte_fixmap;
 	pt_ops.get_pte_virt = get_pte_virt_fixmap;
+
 #ifndef __PAGETABLE_PMD_FOLDED
 	pt_ops.alloc_pmd = alloc_pmd_fixmap;
 	pt_ops.get_pmd_virt = get_pmd_virt_fixmap;
-#endif
+#endif /* __PAGETABLE_PMD_FOLDED */
+
 	/* Setup swapper PGD for fixmap */
 	create_pgd_mapping(swapper_pg_dir, FIXADDR_START,
 			   __pa_symbol(fixmap_pgd_next),
@@ -699,7 +737,7 @@ static void __init setup_vm_final(void)
 					   PAGE_KERNEL
 #else
 					   PAGE_KERNEL_EXEC
-#endif
+#endif /* CONFIG_64BIT */
 					);
 
 		}
@@ -708,7 +746,7 @@ static void __init setup_vm_final(void)
 #ifdef CONFIG_64BIT
 	/* Map the kernel */
 	create_kernel_page_table(swapper_pg_dir, PMD_SIZE);
-#endif
+#endif /* CONFIG_64BIT */
 
 	/* Clear fixmap PTE and PMD mappings */
 	clear_fixmap(FIX_PTE);
@@ -724,7 +762,7 @@ static void __init setup_vm_final(void)
 #ifndef __PAGETABLE_PMD_FOLDED
 	pt_ops.alloc_pmd = alloc_pmd_late;
 	pt_ops.get_pmd_virt = get_pmd_virt_late;
-#endif
+#endif /* __PAGETABLE_PMD_FOLDED */
 }
 #else
 asmlinkage void __init setup_vm(uintptr_t dtb_pa)

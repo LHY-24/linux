@@ -125,9 +125,9 @@
 
 #ifdef CONFIG_MMU
 /* Number of entries in the page global directory */
-#define PTRS_PER_PGD    (PAGE_SIZE / sizeof(pgd_t)) // TODO：这个常量定义的位置需要明确，因为pgtable-64.h中也有对应的定义
+#define PTRS_PER_PGD    (PAGE_SIZE / sizeof(pgd_t)) // TODO：这个常量定义的位置需要明确，因为pgtable-64.h中第44行也有对应的定义
 /* Number of entries in the page table */
-#define PTRS_PER_PTE    (PAGE_SIZE / sizeof(pte_t))
+#define PTRS_PER_PTE    (PAGE_SIZE / sizeof(pte_t)) // TODO：这个常量定义的位置需要明确，因为pgtable-64.h中第76行也有对应的定义
 
 /* Number of PGD entries that a user-mode program can use */
 #define USER_PTRS_PER_PGD   (TASK_SIZE / PGDIR_SIZE) // 根据进程的大小需要多少个PGD来映射来计算出需要多少个PTR
@@ -147,11 +147,7 @@
 #define PAGE_COPY_READ_EXEC	PAGE_READ_EXEC
 #define PAGE_SHARED		PAGE_WRITE
 #define PAGE_SHARED_EXEC	PAGE_WRITE_EXEC
-#define _PAGE_KERNEL		(_PAGE_READ \
-				| _PAGE_WRITE \
-				| _PAGE_PRESENT \
-				| _PAGE_ACCESSED \
-				| _PAGE_DIRTY)
+#define _PAGE_KERNEL		(_PAGE_READ | _PAGE_WRITE | _PAGE_PRESENT | _PAGE_ACCESSED | _PAGE_DIRTY)
 #define PAGE_KERNEL		__pgprot(_PAGE_KERNEL)
 #define PAGE_KERNEL_READ	__pgprot(_PAGE_KERNEL & ~_PAGE_WRITE)
 #define PAGE_KERNEL_EXEC	__pgprot(_PAGE_KERNEL | _PAGE_EXEC)
@@ -187,16 +183,26 @@ extern pgd_t swapper_pg_dir[];
 #define __S111	PAGE_SHARED_EXEC
 
 
-/* 判断pmd页表项是否有效的函数 */
+/* 判断页表项是否有效的函数 */
 static inline int pmd_present(pmd_t pmd)
 {
 	return (pmd_val(pmd) & (_PAGE_PRESENT | _PAGE_PROT_NONE));
+}
+
+static inline int pte_present(pte_t pte)
+{
+	return (pte_val(pte) & (_PAGE_PRESENT | _PAGE_PROT_NONE));
 }
 
 /* 判断pmd页表项是否为0的函数 */
 static inline int pmd_none(pmd_t pmd)
 {
 	return (pmd_val(pmd) == 0);
+}
+
+static inline int pte_none(pte_t pte)
+{
+	return (pte_val(pte) == 0);
 }
 
 /* 判断pmd页表项无效的函数 */
@@ -225,10 +231,15 @@ static inline void pmd_clear(pmd_t *pmdp)
 	set_pmd(pmdp, __pmd(0));
 }
 
-/* 页帧号 -> pgd页表项 */
+/* 页帧号 -> 页表项 */
 static inline pgd_t pfn_pgd(unsigned long pfn, pgprot_t prot)
 {
 	return __pgd((pfn << _PAGE_PFN_SHIFT) | pgprot_val(prot));
+}
+
+static inline pmd_t pfn_pmd(unsigned long pfn, pgprot_t prot)
+{
+	return __pmd((pfn << _PAGE_PFN_SHIFT) | pgprot_val(prot));
 }
 
 /* Yields the page frame number (PFN) of a page table entry */
@@ -238,31 +249,36 @@ static inline unsigned long _pgd_pfn(pgd_t pgd)
 	return pgd_val(pgd) >> _PAGE_PFN_SHIFT;
 }
 
+static inline unsigned long _pmd_pfn(pmd_t pmd)
+{
+	return pmd_val(pmd) >> _PAGE_PFN_SHIFT;
+}
+
 static inline unsigned long pte_pfn(pte_t pte)
 {
 	return (pte_val(pte) >> _PAGE_PFN_SHIFT);
 }
 
 
-/* pmd页表项 -> 页帧号 —> 页帧结构体 */
+/* 页表项 -> 页帧号 —> 页帧结构体 */
 static inline struct page *pmd_page(pmd_t pmd)
 {
 	return pfn_to_page(pmd_val(pmd) >> _PAGE_PFN_SHIFT);
 }
 
-/* pmd页表项 -> 页帧号 -> 页帧对应的虚拟地址 */
+/* 页表项 -> 页帧号 -> 页帧对应的虚拟地址 */
 static inline unsigned long pmd_page_vaddr(pmd_t pmd)
 {
 	return (unsigned long)pfn_to_virt(pmd_val(pmd) >> _PAGE_PFN_SHIFT);
 }
 
+
+//TODO:以下是和pgtabgle-64.h中不同的部分
 /* pmd页表项 -> pte页表项 */
 static inline pte_t pmd_pte(pmd_t pmd)
 {
 	return __pte(pmd_val(pmd));
 }
-
-
 
 
 /* pte页表项 -> 页帧号 -> 页帧结构体 */
@@ -278,17 +294,6 @@ static inline pte_t pfn_pte(unsigned long pfn, pgprot_t prot)
 /* 页帧结构体 -> 页帧号 -> pte页表项 */
 #define mk_pte(page, prot)       pfn_pte(page_to_pfn(page), prot)
 
-/* 判断pte页表项是否有效的函数 */
-static inline int pte_present(pte_t pte)
-{
-	return (pte_val(pte) & (_PAGE_PRESENT | _PAGE_PROT_NONE));
-}
-
-/* 判断pte页表项是否为0的函数 */
-static inline int pte_none(pte_t pte)
-{
-	return (pte_val(pte) == 0);
-}
 
 /* 设置pte页表项的写权限位 */
 static inline int pte_write(pte_t pte)

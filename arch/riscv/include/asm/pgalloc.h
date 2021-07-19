@@ -29,6 +29,7 @@ static inline void pmd_populate(struct mm_struct *mm,
 	set_pmd(pmd, __pmd((pfn << _PAGE_PFN_SHIFT) | _PAGE_TABLE));
 }
 
+// TODO：这里需要对P4D和PUD进行处理
 #ifndef __PAGETABLE_PMD_FOLDED
 static inline void pud_populate(struct mm_struct *mm, pud_t *pud, pmd_t *pmd)
 {
@@ -55,6 +56,7 @@ static inline pgd_t *pgd_alloc(struct mm_struct *mm)
 	return pgd;
 }
 
+// TODO：这里需要对P4D和PUD进行处理
 #ifndef __PAGETABLE_PMD_FOLDED
 #define __pmd_free_tlb(tlb, pmd, addr)  pmd_free((tlb)->mm, pmd)
 #endif /* __PAGETABLE_PMD_FOLDED */

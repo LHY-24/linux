@@ -22,6 +22,7 @@
 #define HUGE_MAX_HSTATE		1
 #endif
 
+// TODO：这里的SHIFT的大小是否可以为别的尺寸
 #define HPAGE_SHIFT		PMD_SHIFT // PMD对应的大页的偏移为20位
 #define HPAGE_SIZE		(_AC(1, UL) << HPAGE_SHIFT) // PMD对应的大页的大小为1MB
 #define HPAGE_MASK              (~(HPAGE_SIZE - 1)) // PMD对应的大页的掩码

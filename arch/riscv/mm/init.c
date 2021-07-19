@@ -329,6 +329,10 @@ static void __init create_pte_mapping(pte_t *ptep,
 /**
  * TODO：这里需要仿照之前pgd和之后pmd的格式写一下p4d和pud对应的常量和函数
  * */
+pud_t trampoline_pud[PTRS_PER_PUD] __page_aligned_bss;
+pud_t fixmap_pud[PTRS_PER_PUD] __page_aligned_bss;
+pud_t early_pud[PTRS_PER_PUD] __initdata __aligned(PAGE_SIZE);
+pud_t early_dtb_pud[PTRS_PER_PUD] __initdata __aligned(PAGE_SIZE);
 
 /*
  * 定义内存初始化过程中所需要的各种页表，类型为pmd_t
@@ -771,6 +775,7 @@ static void __init setup_vm_final(void)
 	pt_ops.alloc_pte = alloc_pte_fixmap;
 	pt_ops.get_pte_virt = get_pte_virt_fixmap;
 
+	// TODO:对P4D和PUD进行对应的处理
 #ifndef __PAGETABLE_PMD_FOLDED
 	pt_ops.alloc_pmd = alloc_pmd_fixmap;
 	pt_ops.get_pmd_virt = get_pmd_virt_fixmap;
@@ -809,6 +814,7 @@ static void __init setup_vm_final(void)
 	create_kernel_page_table(swapper_pg_dir, PMD_SIZE);
 #endif /* CONFIG_64BIT */
 
+	// TODO：对P4D和PUD进行处理
 	/* Clear fixmap PTE and PMD mappings */
 	clear_fixmap(FIX_PTE);
 	clear_fixmap(FIX_PMD);
@@ -820,6 +826,7 @@ static void __init setup_vm_final(void)
 	/* generic page allocation functions must be used to setup page table */
 	pt_ops.alloc_pte = alloc_pte_late;
 	pt_ops.get_pte_virt = get_pte_virt_late;
+	// TODO：对P4D和PUD进行处理
 #ifndef __PAGETABLE_PMD_FOLDED
 	pt_ops.alloc_pmd = alloc_pmd_late;
 	pt_ops.get_pmd_virt = get_pmd_virt_late;

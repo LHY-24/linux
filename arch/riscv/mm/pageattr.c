@@ -209,8 +209,8 @@ bool kernel_page_present(struct page *page)
 {
 	unsigned long addr = (unsigned long)page_address(page);
 	pgd_t *pgd;
-	pud_t *pud;
 	p4d_t *p4d;
+	pud_t *pud;
 	pmd_t *pmd;
 	pte_t *pte;
 

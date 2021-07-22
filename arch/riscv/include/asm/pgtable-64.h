@@ -120,12 +120,12 @@ static inline int pud_bad(pud_t pud)
  * 根据草案中P74的介绍，当R、W、X不全为0时，表示这是一个leaf pte
  * */
 #define p4d_leaf	p4d_leaf
-#define pud_leaf	pud_leaf
 static inline int p4d_leaf(p4d_t p4d)
 {
 	return p4d_present(p4d) && (p4d_val(p4d) & (_PAGE_READ | _PAGE_WRITE | _PAGE_EXEC));
 }
 
+#define pud_leaf	pud_leaf
 static inline int pud_leaf(pud_t pud)
 {
 	return pud_present(pud) && (pud_val(pud) & (_PAGE_READ | _PAGE_WRITE | _PAGE_EXEC));

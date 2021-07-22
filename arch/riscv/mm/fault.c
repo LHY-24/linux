@@ -93,8 +93,8 @@ static inline void bad_area(struct pt_regs *regs, struct mm_struct *mm, int code
 static inline void vmalloc_fault(struct pt_regs *regs, int code, unsigned long addr)
 {
 	pgd_t *pgd, *pgd_k;
-	pud_t *pud, *pud_k;
 	p4d_t *p4d, *p4d_k;
+	pud_t *pud, *pud_k;
 	pmd_t *pmd, *pmd_k;
 	pte_t *pte_k;
 	int index;

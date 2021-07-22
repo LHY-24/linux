@@ -928,6 +928,7 @@ static inline int p4d_bad(p4d_t p4d)
 }
 #endif  /* CONFIG_PGTABLE_LEVELS > 3 */
 
+// TODO:明确这个函数的意义，因为在RV中没有找到类似的实现
 static inline unsigned long p4d_index(unsigned long address)
 {
 	return (address >> P4D_SHIFT) & (PTRS_PER_P4D - 1);

@@ -29,16 +29,9 @@ static inline void pmd_populate(struct mm_struct *mm,
 	set_pmd(pmd, __pmd((pfn << _PAGE_PFN_SHIFT) | _PAGE_TABLE));
 }
 
-// TODO：这里需要对P4D和PUD进行处理
-#ifndef __PAGETABLE_PUD_FOLDED
-static inline void p4d_populate(struct mm_struct *mm, p4d_t *p4d, pud_t *pud)
-{
-	unsigned long pfn = virt_to_pfn(pud);
-
-	set_p4d(p4d, __p4d((pfn << _PAGE_PFN_SHIFT) | _PAGE_TABLE));
-}
-#endif
-
+/* TODO：这里需要对P4D和PUD进行处理
+ * 目前不确定判断的依据，是CONFIG_PGTABLE_LEVELS还是__PAGETABLE_PXD_FOLDED
+ * */
 #ifndef __PAGETABLE_PMD_FOLDED
 static inline void pud_populate(struct mm_struct *mm, pud_t *pud, pmd_t *pmd)
 {
@@ -47,6 +40,15 @@ static inline void pud_populate(struct mm_struct *mm, pud_t *pud, pmd_t *pmd)
 	set_pud(pud, __pud((pfn << _PAGE_PFN_SHIFT) | _PAGE_TABLE));
 }
 #endif /* __PAGETABLE_PMD_FOLDED */
+
+#ifndef __PAGETABLE_PUD_FOLDED
+static inline void p4d_populate(struct mm_struct *mm, p4d_t *p4d, pud_t *pud)
+{
+	unsigned long pfn = virt_to_pfn(pud);
+
+	set_p4d(p4d, __p4d((pfn << _PAGE_PFN_SHIFT) | _PAGE_TABLE));
+}
+#endif /* __PAGETABLE_PUD_FOLDED */
 
 #define pmd_pgtable(pmd)	pmd_page(pmd)
 
@@ -69,6 +71,14 @@ static inline pgd_t *pgd_alloc(struct mm_struct *mm)
 #ifndef __PAGETABLE_PMD_FOLDED
 #define __pmd_free_tlb(tlb, pmd, addr)  pmd_free((tlb)->mm, pmd)
 #endif /* __PAGETABLE_PMD_FOLDED */
+
+#ifndef __PAGETABLE_PUD_FOLDED
+#define __pud_free_tlb(tlb, pud, addr)  pud_free((tlb)->mm, pud)
+#endif /* __PAGETABLE_PMD_FOLDED */
+
+#ifndef __PAGETABLE_P4D_FOLDED
+#define __p4d_free_tlb(tlb, p4d, addr)  p4d_free((tlb)->mm, p4d)
+#endif /* __PAGETABLE_P4D_FOLDED */
 
 #define __pte_free_tlb(tlb, pte, buf)   \
 do {                                    \

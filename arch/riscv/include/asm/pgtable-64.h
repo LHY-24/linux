@@ -35,6 +35,11 @@
 #define PMD_SIZE        (_AC(1, UL) << PMD_SHIFT)
 #define PMD_MASK        (~(PMD_SIZE - 1))
 
+/**
+ * TODO：
+ * page.h中已经有pgd_t和pte_t的定义，这里需要去重
+ * 在对PTRS_PER_PXD进行赋值的时候，是这里的定义优先，还是pgtable-nopxd.h中的定义优先
+ * */
 /** Page Global Directory entry */
 //typedef struct {
 //	unsigned long pgd;
@@ -212,6 +217,13 @@ static inline unsigned long pud_page_vaddr(pud_t pud)
 {
 	return (unsigned long)pfn_to_virt(pud_val(pud) >> _PAGE_PFN_SHIFT);
 }
+
+/**
+ * TODO：
+ * 参照Alex的补丁，这里可能需要定义mm_p4d_folded和mm_pud_folded
+ * Alex利用了pgtable_l4_enabled这个变量，但是这里的值如何确定还有待商榷
+ * 同时可能还需要定义p4d_index、pud_index和pmd_index，但是一方面不确定定义的位置，另一方面不确定为什么pmd要在这里定义
+ * */
 
 /**
  * 错误信息处理

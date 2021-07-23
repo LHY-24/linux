@@ -33,9 +33,9 @@ enum fixed_addresses {
 	 */
 	FIX_PTE,
 	FIX_PMD,
-	FIX_PUD, // lhy_add
-	FIX_P4D, // lhy_add
-	FIX_PGD, // lhy_add
+	FIX_PUD,
+	FIX_P4D,
+	FIX_PGD,
 	FIX_TEXT_POKE1,
 	FIX_TEXT_POKE0,
 	FIX_EARLYCON_MEM_BASE,

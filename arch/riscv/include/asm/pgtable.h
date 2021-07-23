@@ -22,7 +22,7 @@
 
 #ifdef CONFIG_64BIT
 /* Leave 2GB for kernel and BPF at the end of the address space */
-#define KERNEL_LINK_ADDR	(ADDRESS_SPACE_END - SZ_2G + 1) // 将虚拟地址空间的最后2GB留给内核
+#define KERNEL_LINK_ADDR	(ADDRESS_SPACE_END - SZ_2G + 1) // 64位系统中将虚拟地址空间的最后2GB留给内核
 #else
 #define KERNEL_LINK_ADDR	PAGE_OFFSET // 32位系统中内核的加载位置仍为PAGE_OFFSET
 #endif /* CONFIG_64BIT */
@@ -97,20 +97,20 @@
 
 
 #ifndef __ASSEMBLY__
-/* Page Upper Directory not used in RISC-V */
-#ifndef CONFIG_RV64_5LEVEL
-#include <asm-generic/pgtable-nopud.h> // lhy_del：如果是5级分页，这里不应该关闭pud
-#endif /* CONFIG_RV64_5LEVEL */
-
 #include <asm/page.h>
 #include <asm/tlbflush.h>
 #include <linux/mm_types.h>
 
+// 根据系统的位数以及是否开启5级分页，来加载不同的头文件
 #ifdef CONFIG_64BIT
 #include <asm/pgtable-64.h>
 #else
 #include <asm/pgtable-32.h>
 #endif /* CONFIG_64BIT */
+
+#ifndef CONFIG_RV64_5LEVEL
+#include <asm-generic/pgtable-nopud.h>
+#endif /* CONFIG_RV64_5LEVEL */
 
 #ifdef CONFIG_XIP_KERNEL
 #define XIP_FIXUP(addr) ({							\
@@ -128,7 +128,6 @@
 #define PTRS_PER_PGD    (PAGE_SIZE / sizeof(pgd_t)) // TODO：这个常量定义的位置需要明确，因为pgtable-64.h中第44行也有对应的定义
 /* Number of entries in the page table */
 #define PTRS_PER_PTE    (PAGE_SIZE / sizeof(pte_t)) // TODO：这个常量定义的位置需要明确，因为pgtable-64.h中第76行也有对应的定义
-
 /* Number of PGD entries that a user-mode program can use */
 #define USER_PTRS_PER_PGD   (TASK_SIZE / PGDIR_SIZE) // 根据进程的大小需要多少个PGD来映射来计算出需要多少个PTR
 
@@ -194,7 +193,7 @@ static inline int pte_present(pte_t pte)
 	return (pte_val(pte) & (_PAGE_PRESENT | _PAGE_PROT_NONE));
 }
 
-/* 判断pmd页表项是否为0的函数 */
+/* 判断页表项是否为0的函数 */
 static inline int pmd_none(pmd_t pmd)
 {
 	return (pmd_val(pmd) == 0);
@@ -272,14 +271,12 @@ static inline unsigned long pmd_page_vaddr(pmd_t pmd)
 	return (unsigned long)pfn_to_virt(pmd_val(pmd) >> _PAGE_PFN_SHIFT);
 }
 
-
 //TODO:以下是和pgtabgle-64.h中不同的部分
 /* pmd页表项 -> pte页表项 */
 static inline pte_t pmd_pte(pmd_t pmd)
 {
 	return __pte(pmd_val(pmd));
 }
-
 
 /* pte页表项 -> 页帧号 -> 页帧结构体 */
 #define pte_page(x)     pfn_to_page(pte_pfn(x))
@@ -293,7 +290,6 @@ static inline pte_t pfn_pte(unsigned long pfn, pgprot_t prot)
 
 /* 页帧结构体 -> 页帧号 -> pte页表项 */
 #define mk_pte(page, prot)       pfn_pte(page_to_pfn(page), prot)
-
 
 /* 设置pte页表项的写权限位 */
 static inline int pte_write(pte_t pte)

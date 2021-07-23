@@ -36,6 +36,7 @@
 #define SR_SD		_AC(0x8000000000000000, UL) /* FS/XS dirty */
 #endif
 
+// TODO：SATP_MODE初值的确定
 /* SATP flags */
 #ifndef CONFIG_64BIT
 #define SATP_PPN	_AC(0x003FFFFF, UL)
@@ -47,9 +48,19 @@
 #else
 #define SATP_PPN	_AC(0x00000FFFFFFFFFFF, UL)
 #define SATP_MODE_39	_AC(0x8000000000000000, UL)
-#define SATP_MODE_48	_AC(0x9000000000000000, UL) // lhy_add
-#define SATP_MODE_57	_AC(0xA000000000000000, UL) // lhy_add
+#define SATP_MODE_48	_AC(0x9000000000000000, UL)
+#define SATP_MODE_57	_AC(0xA000000000000000, UL)
+
+#ifdef RV64_5LEVEL
+#define SATP_MODE	SATP_MODE_57
+#else
+#ifdef RV64_4LEVEL
+#define SATP_MODE	SATP_MODE_48
+#else
 #define SATP_MODE	SATP_MODE_39
+#endif /*RV64_4LEVEL*/
+#endif /*RV64_5LEVEL*/
+
 #define SATP_ASID_BITS	16
 #define SATP_ASID_SHIFT	44
 #define SATP_ASID_MASK	_AC(0xFFFF, UL)

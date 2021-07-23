@@ -30,6 +30,15 @@ static inline void pmd_populate(struct mm_struct *mm,
 }
 
 // TODO：这里需要对P4D和PUD进行处理
+#ifndef __PAGETABLE_PUD_FOLDED
+static inline void p4d_populate(struct mm_struct *mm, p4d_t *p4d, pud_t *pud)
+{
+	unsigned long pfn = virt_to_pfn(pud);
+
+	set_p4d(p4d, __p4d((pfn << _PAGE_PFN_SHIFT) | _PAGE_TABLE));
+}
+#endif
+
 #ifndef __PAGETABLE_PMD_FOLDED
 static inline void pud_populate(struct mm_struct *mm, pud_t *pud, pmd_t *pmd)
 {

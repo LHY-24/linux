@@ -130,7 +130,7 @@ config MMU
 	bool "MMU-based Paged Memory Management Support"
 	default y
 	help
-	  Select if you want MMU-based virtualised addressing space
+	  Select if you want MMU-based virtualized addressing space
 	  support by paged memory management. If unsure, say 'Y'.
 
 config ZONE_DMA32
@@ -564,7 +564,6 @@ source "drivers/firmware/Kconfig"
 config RV64_5LEVEL
 	bool "Enable 5-level page tables support"
 	default y
-	select DYNAMIC_MEMORY_LAYOUT
 	select SPARSEMEM_VMEMMAP
 	depends on RV64
 	---help---
@@ -582,19 +581,18 @@ config RV64_5LEVEL
 
 config RV64_4LEVEL
 	bool "Enable 4-level page tables support"
-	default y
-	select DYNAMIC_MEMORY_LAYOUT
+	default n
 	select SPARSEMEM_VMEMMAP
 	depends on RV64
 	---help---
 	  4-level paging enables access to larger address space:
-	  upto 256 TiB of virtual address space and 4 PiB of
+	  upto 64 PiB of virtual address space and 4 PiB of
 	  physical address space.
 
 	  A kernel with the option enabled can be booted on machines that
 	  support 4- or 5-level paging.
 
-	  See Documentation/x86/x86_64/5level-paging.rst for more
+	  See Documentation/risc-v/4level-paging.rst for more
 	  information.
 
 	  Say N if unsure.

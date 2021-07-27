@@ -22,7 +22,7 @@ static inline void pmd_populate_kernel(struct mm_struct *mm,
 }
 
 static inline void pmd_populate(struct mm_struct *mm,
-	pmd_t *pmd, pgtable_t pte)
+	pmd_t *pmd, pgtable_t pte) // 物理页升级？TODO：查询这个函数的作用,编译解析
 {
 	unsigned long pfn = virt_to_pfn(page_address(pte));
 

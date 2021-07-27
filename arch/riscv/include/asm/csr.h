@@ -51,12 +51,13 @@
 #define SATP_MODE_48	_AC(0x9000000000000000, UL)
 #define SATP_MODE_57	_AC(0xA000000000000000, UL)
 
+// TODO：elsif
 #ifdef RV64_5LEVEL
 #define SATP_MODE	SATP_MODE_57
-#else
+#else /*RV64_5LEVEL*/
 #ifdef RV64_4LEVEL
 #define SATP_MODE	SATP_MODE_48
-#else
+#else /*RV64_4LEVEL*/
 #define SATP_MODE	SATP_MODE_39
 #endif /*RV64_4LEVEL*/
 #endif /*RV64_5LEVEL*/

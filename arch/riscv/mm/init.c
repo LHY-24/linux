@@ -30,7 +30,7 @@
 #include "../kernel/head.h"
 
 /**
- * 这里是对一些常量和变量的声明
+ * 常量和变量的声明
  * */
 unsigned long kernel_virt_addr = KERNEL_LINK_ADDR; // 内核空间的起始地址
 EXPORT_SYMBOL(kernel_virt_addr);
@@ -48,10 +48,11 @@ void *_dtb_early_va __initdata;
 uintptr_t _dtb_early_pa __initdata;
 
 /**
- * 页表分配选项
+ * 与页表分配相关的结构体
+ * TODO：搞清楚结构体中每一个成员函数的作用以及具体的应用位置，这个和Sv57相关
  * */
 struct pt_alloc_ops {
-	pte_t *(*get_pte_virt)(phys_addr_t pa); // 根据物理地址获取pte中对应的页表项
+	pte_t *(*get_pte_virt)(phys_addr_t pa); // 根据物理地址获取对应的页表项pte
 	phys_addr_t (*alloc_pte)(uintptr_t va); // 根据虚拟地址获取物理地址
 
 #ifndef __PAGETABLE_PMD_FOLDED
@@ -72,26 +73,35 @@ struct pt_alloc_ops {
 
 static phys_addr_t dma32_phys_limit __ro_after_init;
 
+/**
+ * 对内存中各区域的大小进行初始化的函数：
+ * 一般的static函数，执行后会常驻于内存，以便其它程序再次调用。
+ * 加上__init标识后，该函数只会被调用一次，调用之后，函数立即被回收，以节约内存开销。
+ * 这个函数在arm中有类似的实现: https://blog.csdn.net/zhangwenxinzck/article/details/103524021
+ * */
 static void __init zone_sizes_init(void)
 {
-	unsigned long max_zone_pfns[MAX_NR_ZONES] = { 0, };
+	unsigned long max_zone_pfns[MAX_NR_ZONES] = { 0, }; // 标识各个内存区域的起始页框号(page frame num)
 
 #ifdef CONFIG_ZONE_DMA32
 	max_zone_pfns[ZONE_DMA32] = PFN_DOWN(dma32_phys_limit);
 #endif
-	max_zone_pfns[ZONE_NORMAL] = max_low_pfn;
+	max_zone_pfns[ZONE_NORMAL] = max_low_pfn; // 实际映射到的物理内存地址的最大页框号
 
-	free_area_init(max_zone_pfns);
+	free_area_init(max_zone_pfns); // 打印各zone区域的范围
 }
 
-/** 将空闲页初始化为0的函数 */
+/**
+ * 将空闲页初始化为0的函数：
+ * empty_zero_page为该文件之前定义的数组
+ * */
 static void __init setup_zero_page(void)
 {
 	memset((void *)empty_zero_page, 0, PAGE_SIZE);
 }
 
 /**
- * 虚拟内存布局相关：
+ * 输出虚拟内存布局相关信息的函数：
  * %s是输出字符串
  * %x是输出长整型十六进制数据
  * %ld是输出长整型十进制数据
@@ -136,7 +146,9 @@ static void __init print_vm_layout(void)
 static void print_vm_layout(void) { }
 #endif /* CONFIG_DEBUG_VM */
 
-/** 内存初始化函数 */
+/**
+ * 内存初始化函数
+ * */
 void __init mem_init(void)
 {
 #ifdef CONFIG_FLATMEM

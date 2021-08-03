@@ -29,6 +29,9 @@
 
 #include "../kernel/head.h"
 
+/**
+ * 这里是对一些常量和变量的声明
+ * */
 unsigned long kernel_virt_addr = KERNEL_LINK_ADDR; // 内核空间的起始地址
 EXPORT_SYMBOL(kernel_virt_addr);
 #ifdef CONFIG_XIP_KERNEL
@@ -44,9 +47,12 @@ extern char _start[];
 void *_dtb_early_va __initdata;
 uintptr_t _dtb_early_pa __initdata;
 
+/**
+ * 页表分配选项
+ * */
 struct pt_alloc_ops {
 	pte_t *(*get_pte_virt)(phys_addr_t pa); // 根据物理地址获取pte中对应的页表项
-	phys_addr_t (*alloc_pte)(uintptr_t va);
+	phys_addr_t (*alloc_pte)(uintptr_t va); // 根据虚拟地址获取物理地址
 
 #ifndef __PAGETABLE_PMD_FOLDED
 	pmd_t *(*get_pmd_virt)(phys_addr_t pa);
@@ -54,13 +60,13 @@ struct pt_alloc_ops {
 #endif
 
 #ifndef __PAGETABLE_PUD_FOLDED
-	pud_t *(*get_pud_virt)(phys_addr_t pa); // lhy_add
-	phys_addr_t (*alloc_pud)(uintptr_t va); // lhy_add
+	pud_t *(*get_pud_virt)(phys_addr_t pa);
+	phys_addr_t (*alloc_pud)(uintptr_t va);
 #endif
 
 #ifndef __PAGETABLE_P4D_FOLDED
-	p4d_t *(*get_p4d_virt)(phys_addr_t pa); // lhy_add
-	phys_addr_t (*alloc_p4d)(uintptr_t va); // lhy_add
+	p4d_t *(*get_p4d_virt)(phys_addr_t pa);
+	phys_addr_t (*alloc_p4d)(uintptr_t va);
 #endif
 };
 
@@ -445,6 +451,7 @@ static void __init create_pmd_mapping(pmd_t *pmdp,
 #define create_pgd_next_mapping(__nextp, __va, __pa, __sz, __prot)	\
 	create_pud_mapping(__nextp, __va, __pa, __sz, __prot)
 #define fixmap_pgd_next		fixmap_pud
+
 #else /* RV64_4LEVEL */
 #define pgd_next_t		pmd_t
 #define alloc_pgd_next(__va)	pt_ops.alloc_pmd(__va)
@@ -452,6 +459,7 @@ static void __init create_pmd_mapping(pmd_t *pmdp,
 #define create_pgd_next_mapping(__nextp, __va, __pa, __sz, __prot)	\
 	create_pmd_mapping(__nextp, __va, __pa, __sz, __prot)
 #define fixmap_pgd_next		fixmap_pmd
+
 #endif /* RV64_4LEVEL */
 
 #endif /* RV64_5LEVEL */
@@ -475,23 +483,23 @@ void __init create_pgd_mapping(pgd_t *pgdp,
 	phys_addr_t next_phys;
 	uintptr_t pgd_idx = pgd_index(va); // 虚拟地址对应的页表项在pgd中的索引
 
-	if (sz == PGDIR_SIZE) {
-		if (pgd_val(pgdp[pgd_idx]) == 0)
-			pgdp[pgd_idx] = pfn_pgd(PFN_DOWN(pa), prot);
+	if (sz == PGDIR_SIZE) { // 如果以PGD为单位建立映射
+		if (pgd_val(pgdp[pgd_idx]) == 0) // 如果这个虚拟地址对应的页表项为空
+			pgdp[pgd_idx] = pfn_pgd(PFN_DOWN(pa), prot); // 就将对应的物理地址写入到该页表项中
 		return;
 	}
 
-	if (pgd_val(pgdp[pgd_idx]) == 0) {
-		next_phys = alloc_pgd_next(va);
-		pgdp[pgd_idx] = pfn_pgd(PFN_DOWN(next_phys), PAGE_TABLE);
-		nextp = get_pgd_next_virt(next_phys);
-		memset(nextp, 0, PAGE_SIZE);
+	if (pgd_val(pgdp[pgd_idx]) == 0) { // 如果该页表项为空
+		next_phys = alloc_pgd_next(va); // 为该虚拟地址分配对应页表大小的空间，并记录对应的物理地址
+		pgdp[pgd_idx] = pfn_pgd(PFN_DOWN(next_phys), PAGE_TABLE); // 将分配的地址所在页的页号记录在页表中
+		nextp = get_pgd_next_virt(next_phys); // 给指向该页表项的指针赋值
+		memset(nextp, 0, PAGE_SIZE); // 将该页表项所指向的页大小的空间清空，也就是说得到了一个空的页表
 	} else {
 		next_phys = PFN_PHYS(_pgd_pfn(pgdp[pgd_idx]));
 		nextp = get_pgd_next_virt(next_phys);
 	}
 
-	create_pgd_next_mapping(nextp, va, pa, sz, prot);
+	create_pgd_next_mapping(nextp, va, pa, sz, prot); // 建立对应的映射
 }
 
 /* 获取最合适的映射范围 */
@@ -499,9 +507,9 @@ static uintptr_t __init best_map_size(phys_addr_t base, phys_addr_t size)
 {
 	/* Upgrade to PMD_SIZE mappings whenever possible */
 	if ((base & (PMD_SIZE - 1)) || (size & (PMD_SIZE - 1))) // 判断与PMD_SIZE是否对齐
-		return PAGE_SIZE;
+		return PAGE_SIZE; // 如果不能够以PMD为单位进行映射，就以页为单位进行映射
 
-	return PMD_SIZE;
+	return PMD_SIZE; // 如果能够以PMD的大小为单位进行映射，就按照PMD的大小进行映射
 }
 
 #ifdef CONFIG_XIP_KERNEL
@@ -565,11 +573,11 @@ static void __init create_kernel_page_table(pgd_t *pgdir, uintptr_t map_size)
 }
 #else
 /* 创建内核页表 */
-static void __init create_kernel_page_table(pgd_t *pgdir, uintptr_t map_size) // 两个参数分别为指向pgd的指针以及映射区域的大小
+static void __init create_kernel_page_table(pgd_t *pgdir, uintptr_t map_size) // 两个参数分别为指向pgd页表项的指针以及映射区域的大小
 {
 	uintptr_t va, end_va;
 
-	end_va = kernel_virt_addr + load_sz; // 内核的结束地址 = 起始地址 + 加载的内核大小
+	end_va = kernel_virt_addr + load_sz; // 内核的结束地址 = 内核加载的起始地址 + 内核大小
 	for (va = kernel_virt_addr; va < end_va; va += map_size) // 从起始地址开始，到结束地址为止，以map_size为单位建立内核映射
 		create_pgd_mapping(pgdir, va,
 				   load_pa + (va - kernel_virt_addr),
@@ -599,8 +607,8 @@ asmlinkage void __init setup_vm(uintptr_t dtb_pa)
 
 	va_kernel_xip_pa_offset = kernel_virt_addr - xiprom;
 #else
-	load_pa = (uintptr_t)(&_start);
-	load_sz = (uintptr_t)(&_end) - load_pa;
+	load_pa = (uintptr_t)(&_start); // 内核加载的起始物理地址
+	load_sz = (uintptr_t)(&_end) - load_pa; // 内核加载的大小
 #endif /* CONFIG_XIP_KERNEL */
 
 	va_pa_offset = PAGE_OFFSET - load_pa; // 线性映射到的物理地址与虚拟地址之间的偏移（虚拟空间中的地址>映射到的物理地址）
@@ -621,21 +629,84 @@ asmlinkage void __init setup_vm(uintptr_t dtb_pa)
 	BUG_ON((PAGE_OFFSET % PGDIR_SIZE) != 0);
 	BUG_ON((load_pa % map_size) != 0);
 
+	/**
+	 * TODO：不是很理解这两个函数的作用
+	 * 后续需要针对P4D和PUD做相应的处理
+	 * */
 	pt_ops.alloc_pte = alloc_pte_early;
 	pt_ops.get_pte_virt = get_pte_virt_early;
 
-	// TODO：这里需要对P4D和PUD进行相应的处理
 #ifndef __PAGETABLE_PMD_FOLDED
 	pt_ops.alloc_pmd = alloc_pmd_early;
 	pt_ops.get_pmd_virt = get_pmd_virt_early;
 #endif /* __PAGETABLE_PMD_FOLDED */
+
+#ifndef __PAGETABLE_PUD_FOLDED
+	pt_ops.alloc_pud = alloc_pud_early;
+	pt_ops.get_pud_virt = get_pud_virt_early;
+#endif /* __PAGETABLE_PUD_FOLDED */
+
+#ifndef __PAGETABLE_P4D_FOLDED
+	pt_ops.alloc_p4d = alloc_p4d_early;
+	pt_ops.get_p4d_virt = get_p4d_virt_early;
+#endif /* __PAGETABLE_P4D_FOLDED */
 
 	/* Setup early PGD for fixmap */
 	create_pgd_mapping(early_pg_dir, FIXADDR_START,
 			   (uintptr_t)fixmap_pgd_next,
 			   PGDIR_SIZE, PAGE_TABLE);
 
-	// TODO：这里需要对P4D和PUD进行相应的处理
+	/**
+	 * TODO：建立关于fixmap的映射
+	 * 这里需要对P4D和PUD进行相应的处理，一个处理起来的难点如下：
+	 * 当只有Sv32和Sv39时，可以根据PMD是否折叠来决定是设置trampoline PGD和PMD还是只设置trampoline PGD
+	 * 现在加入了Sv48和Sv57，需要针对页表级数来决定设置trampoline时具体的配置项，判断的逻辑复杂了很多
+	 * 一种实现的思路是将多种判断逻辑嵌套，根据各级页表的折叠情况逐级进行处理
+	 * 第二个难点如下：
+	 * 如果存在多级页表，如果设置trampoline P4D、PUD、PMD，具体的函数和参数分别是什么
+	 * */
+#ifndef __PAGETABLE_P4D_FOLDED
+	/* Setup fixmap P4D */
+	create_p4d_mapping(fixmap_p4d, FIXADDR_START,
+			   (uintptr_t)fixmap_p4d_next,
+			   P4D_SIZE, PAGE_TABLE);
+
+	/* Setup trampoline PGD and P4D */
+	create_pgd_mapping(trampoline_pg_dir, kernel_virt_addr,
+			   (uintptr_t)trampoline_p4d,
+			   PGDIR_SIZE, PAGE_TABLE);
+
+#ifdef CONFIG_XIP_KERNEL
+	create_p4d_mapping(trampoline_p4d, kernel_virt_addr,
+			   xiprom, P4D_SIZE, PAGE_KERNEL_EXEC);
+#else
+	create_p4d_mapping(trampoline_p4d, kernel_virt_addr,
+			   load_pa, P4D_SIZE, PAGE_KERNEL_EXEC);
+#endif /* CONFIG_XIP_KERNEL */
+#endif /* __PAGETABLE_PMD_FOLDED */
+
+
+#ifndef __PAGETABLE_PUD_FOLDED
+	/* Setup fixmap PUD */
+	create_pud_mapping(fixmap_pud, FIXADDR_START,
+			   (uintptr_t)fixmap_pud_next,
+			   PUD_SIZE, PAGE_TABLE);
+
+	/* Setup trampoline PGD and PUD */
+	create_pgd_mapping(trampoline_pg_dir, kernel_virt_addr,
+			   (uintptr_t)trampoline_pud,
+			   PGDIR_SIZE, PAGE_TABLE);
+
+#ifdef CONFIG_XIP_KERNEL
+	create_pud_mapping(trampoline_pud, kernel_virt_addr,
+			   xiprom, PUD_SIZE, PAGE_KERNEL_EXEC);
+#else
+	create_pud_mapping(trampoline_pud, kernel_virt_addr,
+			   load_pa, PUD_SIZE, PAGE_KERNEL_EXEC);
+#endif /* CONFIG_XIP_KERNEL */
+#endif /* __PAGETABLE_PUD_FOLDED */
+
+
 #ifndef __PAGETABLE_PMD_FOLDED
 	/* Setup fixmap PMD */
 	create_pmd_mapping(fixmap_pmd, FIXADDR_START,
@@ -662,6 +733,8 @@ asmlinkage void __init setup_vm(uintptr_t dtb_pa)
 			   PGDIR_SIZE, PAGE_KERNEL_EXEC);
 #endif /* __PAGETABLE_PMD_FOLDED */
 
+
+
 	/*
 	 * Setup early PGD covering entire kernel which will allow
 	 * us to reach paging_init(). We map all memory banks later
@@ -669,6 +742,10 @@ asmlinkage void __init setup_vm(uintptr_t dtb_pa)
 	 */
 	create_kernel_page_table(early_pg_dir, map_size);
 
+	/**
+	 * TODO：对P4D和PUD进行相应的处理
+	 * 具体的修改思路还没有想好，需要在看懂下列代码的基础上考虑如何修改
+	 * */
 #ifndef __PAGETABLE_PMD_FOLDED
 	/* Setup early PMD for DTB */
 	create_pgd_mapping(early_pg_dir, DTB_EARLY_BASE_VA,
@@ -776,6 +853,16 @@ static void __init setup_vm_final(void)
 	pt_ops.get_pte_virt = get_pte_virt_fixmap;
 
 	// TODO:对P4D和PUD进行对应的处理
+#ifndef __PAGETABLE_P4D_FOLDED
+	pt_ops.alloc_p4d = alloc_p4d_fixmap;
+	pt_ops.get_p4d_virt = get_p4d_virt_fixmap;
+#endif /* __PAGETABLE_P4D_FOLDED */
+
+#ifndef __PAGETABLE_PUD_FOLDED
+	pt_ops.alloc_pud = alloc_pud_fixmap;
+	pt_ops.get_pud_virt = get_pud_virt_fixmap;
+#endif /* __PAGETABLE_PUD_FOLDED */
+
 #ifndef __PAGETABLE_PMD_FOLDED
 	pt_ops.alloc_pmd = alloc_pmd_fixmap;
 	pt_ops.get_pmd_virt = get_pmd_virt_fixmap;
@@ -818,6 +905,8 @@ static void __init setup_vm_final(void)
 	/* Clear fixmap PTE and PMD mappings */
 	clear_fixmap(FIX_PTE);
 	clear_fixmap(FIX_PMD);
+	clear_fixmap(FIX_PUD);
+	clear_fixmap(FIX_P4D);
 
 	/* Move to swapper page table */
 	csr_write(CSR_SATP, PFN_DOWN(__pa_symbol(swapper_pg_dir)) | SATP_MODE);
@@ -826,7 +915,18 @@ static void __init setup_vm_final(void)
 	/* generic page allocation functions must be used to setup page table */
 	pt_ops.alloc_pte = alloc_pte_late;
 	pt_ops.get_pte_virt = get_pte_virt_late;
+
 	// TODO：对P4D和PUD进行处理
+#ifndef __PAGETABLE_P4D_FOLDED
+	pt_ops.alloc_p4d = alloc_p4d_late;
+	pt_ops.get_p4d_virt = get_p4d_virt_late;
+#endif /* __PAGETABLE_P4D_FOLDED */
+
+#ifndef __PAGETABLE_PUD_FOLDED
+	pt_ops.alloc_pud = alloc_pud_late;
+	pt_ops.get_pud_virt = get_pud_virt_late;
+#endif /* __PAGETABLE_PUD_FOLDED */
+
 #ifndef __PAGETABLE_PMD_FOLDED
 	pt_ops.alloc_pmd = alloc_pmd_late;
 	pt_ops.get_pmd_virt = get_pmd_virt_late;

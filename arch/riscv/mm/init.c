@@ -147,7 +147,8 @@ static void print_vm_layout(void) { }
 #endif /* CONFIG_DEBUG_VM */
 
 /**
- * 内存初始化函数
+ * 系统启动时，函数start_kernel调用mm_init对内存相关的模块进行初始化
+ * 这个函数与体系结构相关，负责释放内存到伙伴系统，同时设置内存相关的全局变量
  * */
 void __init mem_init(void)
 {

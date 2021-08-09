@@ -147,19 +147,24 @@ static void print_vm_layout(void) { }
 #endif /* CONFIG_DEBUG_VM */
 
 /**
+ * memblock为逻辑内存块管理
  * 系统启动时，函数start_kernel调用mm_init对内存相关的模块进行初始化
- * 这个函数与体系结构相关，负责释放内存到伙伴系统，同时设置内存相关的全局变量
+ * 这个函数与体系结构相关，负责释放内存到伙伴系统，同时设置内存相关的全局变量：
+ * https://blog.csdn.net/sunlei0625/article/details/58594542
  * */
 void __init mem_init(void)
 {
 #ifdef CONFIG_FLATMEM
-	BUG_ON(!mem_map);
+	BUG_ON(!mem_map); // mem_map是指向struct page数组的指针，用于访问内存中所有的物理页，页帧号pfn同数组的下标相对应
 #endif /* CONFIG_FLATMEM */
 	high_memory = (void *)(__va(PFN_PHYS(max_low_pfn))); // max_low_pfn表示低端内存中最后一个页框号
-	memblock_free_all(); // 释放所有的物理内存
-	print_vm_layout(); // 打印虚拟内存布局
+	memblock_free_all(); // 将memblock中的空闲内存释放到伙伴系统
+	print_vm_layout(); // 将内核映像的各个地址段打印出来
 }
 
+/**
+ * bootmem为物理内存管理
+ * */
 void __init setup_bootmem(void)
 {
 	phys_addr_t vmlinux_end = __pa_symbol(&_end); // 内核结束位置

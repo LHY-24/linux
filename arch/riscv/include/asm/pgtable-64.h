@@ -51,7 +51,7 @@
 /** Page 4 Directory entry */
 typedef struct {
 	unsigned long p4d;
-} p4d_t;
+} p4d_t; // p4d_t的定义已经在include/asm-generic/pgtable-nop4d.h中
 #define p4d_val(x)      ((x).p4d) // 将p4d页表项类型的值转换为无符号类型
 #define __p4d(x)        ((p4d_t) { (x) }) // 将无符号类型转换为p4d页表项类型
 #define PTRS_PER_P4D    (PAGE_SIZE / sizeof(p4d_t)) // PGD的大小为一页，这里用一页的大小来除以页表项的大小，得到PGD中页表项的数目

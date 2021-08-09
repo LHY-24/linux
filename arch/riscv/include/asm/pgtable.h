@@ -107,10 +107,10 @@
 #else
 #include <asm/pgtable-32.h>
 #endif /* CONFIG_64BIT */
-
-#ifndef CONFIG_RV64_5LEVEL
-#include <asm-generic/pgtable-nopud.h>
-#endif /* CONFIG_RV64_5LEVEL */
+//
+//#ifndef CONFIG_RV64_5LEVEL
+//#include <asm-generic/pgtable-nop4d.h>
+//#endif /* CONFIG_RV64_5LEVEL */
 
 #ifdef CONFIG_XIP_KERNEL
 #define XIP_FIXUP(addr) ({							\

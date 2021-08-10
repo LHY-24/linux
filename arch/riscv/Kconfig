@@ -566,7 +566,7 @@ config RV64_5LEVEL
 	default y
 	select SPARSEMEM_VMEMMAP
 	depends on RV64
-	---help---
+	help
 	  5-level paging enables access to larger address space:
 	  upto 128 PiB of virtual address space and 4 PiB of
 	  physical address space.
@@ -584,7 +584,7 @@ config RV64_4LEVEL
 	default n
 	select SPARSEMEM_VMEMMAP
 	depends on RV64
-	---help---
+	help
 	  4-level paging enables access to larger address space:
 	  upto 64 PiB of virtual address space and 4 PiB of
 	  physical address space.

@@ -565,43 +565,19 @@ endmenu
 
 source "drivers/firmware/Kconfig"
 
-
+choice
+    prompt "Page table levels"
+    help
+        Allows choosing one of multiple possible page table levels.
+	  
 config RV64_5LEVEL
-	bool "Enable 5-level page tables support"
-	default y
-	select SPARSEMEM_VMEMMAP
-	depends on RV64
-	help
-	  5-level paging enables access to larger address space:
-	  upto 128 PiB of virtual address space and 4 PiB of
-	  physical address space.
-
-	  A kernel with the option enabled can be booted on machines that
-	  support 4- or 5-level paging.
-
-	  See Documentation/risc-v/5level-paging.rst for more
-	  information.
-
-	  Say N if unsure.
+    bool "Enable 5-level page tables support"
 
 config RV64_4LEVEL
-	bool "Enable 4-level page tables support"
-	default n
-	select SPARSEMEM_VMEMMAP
-	depends on RV64
-	help
-	  4-level paging enables access to larger address space:
-	  upto 64 PiB of virtual address space and 4 PiB of
-	  physical address space.
+    bool "Enable 4-level page tables support"
 
-	  A kernel with the option enabled can be booted on machines that
-	  support 4- or 5-level paging.
-
-	  See Documentation/risc-v/4level-paging.rst for more
-	  information.
-
-	  Say N if unsure.
-	  
+endchoice	  
+	 
 	  
 choice
     prompt "Virtual address space size"

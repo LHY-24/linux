@@ -8,76 +8,170 @@
 
 #include <linux/const.h>
 
-#define PGDIR_SHIFT     30
+#ifdef CONFIG_RV64_5LEVEL
+#define PGDIR_SHIFT	48
 /* Size of region mapped by a page global directory */
-#define PGDIR_SIZE      (_AC(1, UL) << PGDIR_SHIFT)
-#define PGDIR_MASK      (~(PGDIR_SIZE - 1))
+#define PGDIR_SIZE	(_AC(1, UL) << PGDIR_SHIFT)
+#define PGDIR_MASK     (~(PGDIR_SIZE - 1))
+#define MAX_POSSIBLE_PHYSMEM_BITS	56
+#else
+#define PGDIR_SHIFT    39
+#define PGDIR_SIZE     (_AC(1, UL) << PGDIR_SHIFT)
+#define PGDIR_MASK     (~(PGDIR_SIZE - 1))
+#endif
 
-#define PMD_SHIFT       21
-/* Size of region mapped by a page middle directory */
-#define PMD_SIZE        (_AC(1, UL) << PMD_SHIFT)
-#define PMD_MASK        (~(PMD_SIZE - 1))
-
-/* Page Middle Directory entry */
+#if CONFIG_PGTABLE_LEVELS > 4
+#define P4D_SHIFT	39
+#define PTRS_PER_P4D	512
+#define P4D_SIZE	(_AC(1, UL) << P4D_SHIFT)
+#define P4D_MASK	(~(P4D_SIZE - 1))
+/** Page 4 Directory entry */
 typedef struct {
-	unsigned long pmd;
-} pmd_t;
+	unsigned long p4d;
+} p4d_t;
+#define p4d_val(x)      ((x).p4d) 
+#define __p4d(x)        ((p4d_t) { (x) }) 
+static inline int p4d_present(p4d_t p4d)
+{
+	return (p4d_val(p4d) & _PAGE_PRESENT);
+}
+static inline int p4d_none(p4d_t p4d)
+{
+	return (p4d_val(p4d) == 0);
+}
+static inline int p4d_bad(p4d_t p4d)
+{
+	return !p4d_present(p4d);
+}
+#define p4d_leaf	p4d_leaf
+static inline int p4d_leaf(p4d_t p4d)
+{
+	return p4d_present(p4d) && (p4d_val(p4d) & _PAGE_LEAF);
+}
+static inline void set_p4d(p4d_t *p4dp, p4d_t p4d)
+{
+	*p4dp = p4d;
+}
+static inline void p4d_clear(p4d_t *p4dp)
+{
+	set_p4d(p4dp, __p4d(0));
+}
+static inline pud_t *p4d_pgtable(p4d_t p4d)
+{
+	return (pud_t *)pfn_to_virt(p4d_val(p4d) >> _PAGE_PFN_SHIFT);
+}
+static inline struct page *p4d_page(p4d_t p4d)
+{
+	return pfn_to_page(p4d_val(p4d) >> _PAGE_PFN_SHIFT);
+}
+static inline p4d_t pfn_p4d(unsigned long pfn, pgprot_t prot)
+{
+	return __p4d((pfn << _PAGE_PFN_SHIFT) | pgprot_val(prot));
+}
+static inline unsigned long _p4d_pfn(p4d_t p4d)
+{
+	return p4d_val(p4d) >> _PAGE_PFN_SHIFT;
+}
+static inline unsigned long p4d_page_vaddr(p4d_t p4d)
+{
+	return (unsigned long)pfn_to_virt(p4d_val(p4d) >> _PAGE_PFN_SHIFT);
+}
+#else
+#include	<asm-generic/pgtable-nop4d.h> 
+#endif
 
-#define pmd_val(x)      ((x).pmd)
-#define __pmd(x)        ((pmd_t) { (x) })
 
-#define PTRS_PER_PMD    (PAGE_SIZE / sizeof(pmd_t))
-
+#if CONFIG_PGTABLE_LEVELS > 3
+#define PUD_SHIFT	30
+#define PTRS_PER_PUD	512
+#define PUD_SIZE       (_AC(1, UL) << PUD_SHIFT)
+#define PUD_MASK       (~(PUD_SIZE - 1))
+/** Page Upper Directory entry */
+typedef struct {
+	unsigned long pud;
+} pud_t;
+#define pud_val(x)      ((x).pud)
+#define __pud(x)        ((pud_t) { (x) }) 
 static inline int pud_present(pud_t pud)
 {
 	return (pud_val(pud) & _PAGE_PRESENT);
 }
-
 static inline int pud_none(pud_t pud)
 {
 	return (pud_val(pud) == 0);
 }
-
 static inline int pud_bad(pud_t pud)
 {
 	return !pud_present(pud);
 }
-
 #define pud_leaf	pud_leaf
 static inline int pud_leaf(pud_t pud)
 {
 	return pud_present(pud) && (pud_val(pud) & _PAGE_LEAF);
 }
-
 static inline void set_pud(pud_t *pudp, pud_t pud)
 {
 	*pudp = pud;
 }
-
 static inline void pud_clear(pud_t *pudp)
 {
 	set_pud(pudp, __pud(0));
 }
-
 static inline pmd_t *pud_pgtable(pud_t pud)
 {
 	return (pmd_t *)pfn_to_virt(pud_val(pud) >> _PAGE_PFN_SHIFT);
 }
-
 static inline struct page *pud_page(pud_t pud)
 {
 	return pfn_to_page(pud_val(pud) >> _PAGE_PFN_SHIFT);
 }
+static inline pud_t pfn_pud(unsigned long pfn, pgprot_t prot)
+{
+	return __pud((pfn << _PAGE_PFN_SHIFT) | pgprot_val(prot));
+}
+static inline unsigned long _pud_pfn(pud_t pud)
+{
+	return pud_val(pud) >> _PAGE_PFN_SHIFT;
+}
+static inline unsigned long pud_page_vaddr(pud_t pud)
+{
+	return (unsigned long)pfn_to_virt(pud_val(pud) >> _PAGE_PFN_SHIFT);
+}
+#else 
+#include	<asm-generic/pgtable-nopud.h>
+#endif 
 
+
+#if CONFIG_PGTABLE_LEVELS > 2
+#define PMD_SHIFT      21
+/* Size of region mapped by a page middle directory */
+#define PMD_SIZE       (_AC(1, UL) << PMD_SHIFT)
+#define PMD_MASK       (~(PMD_SIZE - 1))
+/* Page Middle Directory entry */
+typedef struct {
+	unsigned long pmd;
+} pmd_t;
+#define pmd_val(x)      ((x).pmd)
+#define __pmd(x)        ((pmd_t) { (x) })
+#define PTRS_PER_PMD    (PAGE_SIZE / sizeof(pmd_t))
 static inline pmd_t pfn_pmd(unsigned long pfn, pgprot_t prot)
 {
 	return __pmd((pfn << _PAGE_PFN_SHIFT) | pgprot_val(prot));
 }
-
 static inline unsigned long _pmd_pfn(pmd_t pmd)
 {
 	return pmd_val(pmd) >> _PAGE_PFN_SHIFT;
 }
+#else 
+#include	<asm-generic/pgtable-nopmd.h>
+#endif 
+
+
+static inline pte_t p4d_pte(p4d_t p4d)
+{
+	return __pte(p4d_val(p4d));
+}
+
 
 #define mk_pmd(page, prot)    pfn_pmd(page_to_pfn(page), prot)
 
